@@ -22,8 +22,8 @@ class FilterSortStateTest {
         difficulty: Difficulty = Difficulty.EASY,
         authorUid: String = "",
         name: String? = null,
-        width: Int = 1,
-        height: Int = 1,
+        width: Int = MIN_NONOGRAM_SIDE,
+        height: Int = MIN_NONOGRAM_SIDE,
         publishStatus: PublishStatus = PublishStatus.NONE,
     ) = Nonogram(
         id = id,
