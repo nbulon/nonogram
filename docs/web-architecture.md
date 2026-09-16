@@ -21,6 +21,7 @@ Each platform owns schema creation differently:
 |------------|-------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
 | Android    | `AndroidSqliteDriver(NonogramDb.Schema.synchronous(), ...)` | the driver, internally, via its create/upgrade callbacks (unchanged behavior)                                                      |
 | Test (JVM) | `JdbcSqliteDriver` (in-memory)                              | `TestDatabaseFactory` calls `Schema.synchronous().create(driver)` explicitly                                                       |
+| Desktop    | `JdbcSqliteDriver` (file)                                   | the driver, from the schema handed to its constructor (`DesktopDatabaseFactory`)                                                   |
 | Web        | `WebWorkerDriver` (OPFS-backed)                             | `WebDatabaseFactory` reads `PRAGMA user_version`, then `awaitCreate`/`awaitMigrate` explicitly, then writes the new `user_version` |
 
 Web needs explicit version tracking because OPFS storage persists across page loads and app deploys — unlike sql.js
@@ -34,33 +35,33 @@ resolved.
 ## One thread, and what that costs
 
 js and wasmJs have a single thread, and it is the one that draws. `Dispatchers.Default` is that thread,
-`Dispatchers.IO` does not exist, and `dbDispatcher` is `EmptyCoroutineContext` for the same reason — there is nowhere
-to hop *to*. A `withContext(Dispatchers.Default)` written for Android's benefit buys web nothing, and anything
-genuinely CPU-bound (the Solver, most visibly) freezes the UI for as long as it runs. The app deliberately runs no
-workers of its own beyond the database one; what follows is how it stays usable without them.
+`Dispatchers.IO` does not exist, and `dbDispatcher` is `EmptyCoroutineContext` for the same reason — there is nowhere to
+hop *to*. A `withContext(Dispatchers.Default)` written for Android's benefit buys web nothing, and anything genuinely
+CPU-bound (the Solver, most visibly) freezes the UI for as long as it runs. The app deliberately runs no workers of its
+own beyond the database one; what follows is how it stays usable without them.
 
 - **Nothing may pin a spinner.** `kotlinx.coroutines.await` on a JS `Promise` cannot cancel the promise, and the
   Firestore JS SDK does not promise to settle one: an offline `setDoc` queues until the client is back online, a
   `getDocs` retries with backoff. So `AuthViewModel` bounds every remote pass with `withTimeoutOrNull(SYNC_TIMEOUT)`
   (`syncAllNow` is the awaitable form the menu uses), releases its `onComplete` callbacks under
   `NonCancellable + Dispatchers.Main` (a plain `withContext` in a `finally` rethrows on a cancelled job and skips the
-  callback), and `MenuViewModel.refresh(sync)` sets and clears `isRefreshing` inside one coroutine rather than
-  trusting a callback from another ViewModel to arrive. For the timeout to unwind, `gated` (web) and `logged`
-  (Android) rethrow `CancellationException` instead of swallowing it into a fallback. `AppSDK` likewise times out
-  driver creation, which happens under a mutex every other database call waits on.
+  callback), and `MenuViewModel.refresh(sync)` sets and clears `isRefreshing` inside one coroutine rather than trusting
+  a callback from another ViewModel to arrive. For the timeout to unwind, `gated` (web) and `logged`
+  (Android) rethrow `CancellationException` instead of swallowing it into a fallback. `AppSDK` likewise times out driver
+  creation, which happens under a mutex every other database call waits on.
 - **A wheel scroll never lets go.** Compose dispatches mouse-wheel scrolling through nested scroll as
-  `NestedScrollSource.UserInput`, the same as a finger drag, but does not fling afterwards (the default fling
-  behaviour is skipped for the wheel). Anything that pairs `onPostScroll` with a release in `onPreFling` —
-  `PullToRefreshBox`, whose indicator otherwise sticks at whatever distance a wheel-up at the top of the list pulled
-  it to — must therefore be gated to touch; `MenuScreen`'s `pullToRefreshByTouchOnly` swallows the overflow unless a
+  `NestedScrollSource.UserInput`, the same as a finger drag, but does not fling afterwards (the default fling behaviour
+  is skipped for the wheel). Anything that pairs `onPostScroll` with a release in `onPreFling` —
+  `PullToRefreshBox`, whose indicator otherwise sticks at whatever distance a wheel-up at the top of the list pulled it
+  to — must therefore be gated to touch; `MenuScreen`'s `pullToRefreshByTouchOnly` swallows the overflow unless a
   non-mouse pointer is down.
 - **Image decode is the browser's.** `scan/ImageDecode.kt` is `expect`: Compose's `decodeToImageBitmap` +
   `readPixels` is synchronous and would decode a 12 MP photo on the UI thread. The web actual hands the picked
   `File` — already a `Blob`, held as `PickedImage` so the bytes never enter Kotlin — to an `<img>`, lets the browser
   decode it off-thread, and `drawImage`s it into a canvas *already sized to `WORKING_SIDE`*, so only the finished
   256-pixel-wide image crosses back into Kotlin. The resample is therefore the browser's rather than
-  `LumaAccumulator`'s box filter, so a web scan is not bit-identical to an Android one; both feed the same
-  interactive threshold.
+  `LumaAccumulator`'s box filter, so a web scan is not bit-identical to an Android one; both feed the same interactive
+  threshold.
 - **Don't decode a grid you will not draw.** Every `solution` and `boardState` is JSON parsed on the UI thread by
   `Database`'s row mappers; `selectProgressForUser` selects progress columns only for exactly this reason.
 
@@ -89,13 +90,12 @@ without gitlive: `kmpauth-google` (publishes js+wasmJs, commonMain dep) obtains 
 `webMain`) do the credential exchange and Firestore I/O. Both v1 seams are now filled:
 
 - **`sync/SyncService`** — web binds `sync/FirebaseWebSyncService` (webMain), which mirrors the androidMain
-  `FirebaseAndroidSyncService` method-for-method against the same Firestore shape, so Android and web sync interoperate.
-  Two collections: progress (`users/{uid}/progress/{nonogramId}`, fields `boardState: String?` +
+  `FirebaseJvmSyncService` method-for-method against the same Firestore shape, so Android and web sync interoperate. Two
+  collections: progress (`users/{uid}/progress/{nonogramId}`, fields `boardState: String?` +
   `updatedAt: number`) and the shared `nonograms/{id}` puzzle collection (own + public). Neither service owns any
-  *policy*: the paths and field names (`sync/FirestoreSchema.kt`), the progress merge
-  (`sync/RemoteProgress.kt`) and the document → `Nonogram` mapping (`sync/NonogramDocument.kt`) all live in
-  commonMain. A platform supplies the fetch, the document write and its own log tag — nothing else, because
-  everything else drifted the last time it was duplicated.
+  *policy*: the paths and field names (`sync/FirestoreSchema.kt`), the progress merge (`sync/RemoteProgress.kt`) and the
+  document → `Nonogram` mapping (`sync/NonogramDocument.kt`) all live in commonMain. A platform supplies the fetch, the
+  document write and its own log tag — nothing else, because everything else drifted the last time it was duplicated.
 - **`screens/GoogleSignInSection`** — the web actual drives kmpauth's `rememberGoogleSignInState` from a
   `GoogleSignInButton`, exchanges the Google token via `FirebaseWeb.signInWithGoogle`, and feeds the resulting Firebase
   `uid`/`displayName` into the unchanged common login flow. Deliberately the *credential-only* state, not
@@ -119,15 +119,15 @@ since Kotlin 2.2.20). The rules that make that work:
 - `QuerySnapshot` is consumed via `.empty` / `.forEach(callback)` instead of `.docs`, sidestepping the js-vs-wasm
   `JsArray` API divergence.
 
-`firebase/FirebaseWeb.kt` is the facade: everything outside the `firebase` package (sync service, sign-in UI,
+`firebase/Firebase.web.kt` is the facade: everything outside the `firebase` package (sync service, sign-in UI,
 `webApp/main.kt`) talks only to it, so if shared externals ever regress the bindings can move per-target without
-touching callers. `initialize` is just config → `initializeApp` → `getAuth`/`getFirestore`; there is no App Check
-on web (see `CLAUDE.md`).
+touching callers. `initialize` is just config → `initializeApp` → `getAuth`/`getFirestore`; there is no App Check on web
+(see `CLAUDE.md`).
 
-The config it is called with is environment-specific: `FirebaseWebConfig.kt` exists twice, in
+The config it is called with is environment-specific: `FirebaseConfig.web.kt` exists twice, in
 `webApp/src/dev` and `webApp/src/prod`, and `webApp/build.gradle.kts` puts one of them on
-`webMain`'s source path via `-Pnonogram.env` (`dev` by default). Only the selected one is indexed by the IDE,
-and a constant added to one must be added to the other; see `docs/prod-firebase-setup.md`.
+`webMain`'s source path via `-Pnonogram.env` (`dev` by default). Only the selected one is indexed by the IDE, and a
+constant added to one must be added to the other; see `docs/prod-firebase-setup.md`.
 
 ### Auth/session details
 
@@ -140,11 +140,11 @@ and a constant added to one must be added to the other; see `docs/prod-firebase-
 - **Session restore gate:** on page reload the app trusts the local SQL `User.firebaseUid`, but the Firebase JS session
   restores asynchronously from indexedDB. Every Firestore op in `FirebaseWebSyncService` first awaits
   `auth.authStateReady()` and verifies the live uid matches — otherwise it logs and no-ops instead of hitting a
-  guaranteed permission-denied. That is `gated(uid, label, fallback) { }`, which wraps the check *and* the
-  best-effort catch around every override, so a new method cannot silently skip the gate. The one exception is
+  guaranteed permission-denied. That is `gated(uid, label, fallback) { }`, which wraps the check *and* the best-effort
+  catch around every override, so a new method cannot silently skip the gate. The one exception is
   `pullPublicNonogramsSince`: approved docs are readable signed out, so it calls `awaitSessionSettled()` — the same
   await, deliberately without the comparison — and keeps its own catch.
-- **Config:** `webApp/.../FirebaseWebConfig.kt` holds committed constants (Firebase web config + the Google web OAuth
+- **Config:** `webApp/.../FirebaseConfig.web.kt` holds committed constants (Firebase web config + the Google web OAuth
   client id). These are public-by-design — they ship in every JS bundle; security comes from Firestore rules and the
   OAuth **Authorized JavaScript origins** allowlist (each dev/prod origin must be listed there; note js and wasmJs dev
   servers on different ports are different origins with separate indexedDB sessions).

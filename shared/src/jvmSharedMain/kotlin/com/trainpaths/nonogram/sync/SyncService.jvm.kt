@@ -13,7 +13,7 @@ import kotlin.time.Clock
 
 private const val LOG_TAG = "FirestoreSync"
 
-class FirebaseAndroidSyncService(private val sdk: AppSDK) : SyncService {
+class FirebaseJvmSyncService(private val sdk: AppSDK) : SyncService {
 
     private val firestore = Firebase.firestore
 

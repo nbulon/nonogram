@@ -31,4 +31,5 @@ dependencyResolutionManagement {
 include(":androidApp")
 include(":shared")
 include(":webApp")
+include(":desktopApp")
 include(":seedTool")

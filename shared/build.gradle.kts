@@ -51,6 +51,8 @@ kotlin {
         binaries.executable()
     }
 
+    jvm("desktop")
+
     android {
         namespace = "com.trainpaths.nonogram.shared"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -67,19 +69,39 @@ kotlin {
         }
     }
 
-    sourceSets {
-        androidMain.dependencies {
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.androidx.activity.compose)
-            implementation(libs.sqldelight.android.driver)
-            implementation(libs.koin.android)
-            implementation(libs.koin.androidx.compose)
+    // Manual dependsOn edges would otherwise switch the template (and so webMain) off
+    applyDefaultHierarchyTemplate()
 
-            implementation(project.dependencies.platform(libs.firebase.bom))
-            implementation(libs.firebase.auth)
-            implementation(libs.firebase.firestore)
-            implementation(libs.kmpauth.firebase)
-            implementation(libs.gitlive.firebase.firestore)
+    sourceSets {
+        // Android + desktop: everything written against gitlive Firebase / kmpauth / Compose rather than an Android API
+        val jvmSharedMain = create("jvmSharedMain") {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(libs.kmpauth.firebase)
+                implementation(libs.gitlive.firebase.auth)
+                implementation(libs.gitlive.firebase.firestore)
+            }
+        }
+        androidMain {
+            dependsOn(jvmSharedMain)
+            dependencies {
+                implementation(libs.compose.uiToolingPreview)
+                implementation(libs.androidx.activity.compose)
+                implementation(libs.sqldelight.android.driver)
+                implementation(libs.koin.android)
+                implementation(libs.koin.androidx.compose)
+
+                implementation(project.dependencies.platform(libs.firebase.bom))
+                implementation(libs.firebase.auth)
+                implementation(libs.firebase.firestore)
+            }
+        }
+        named("desktopMain") {
+            dependsOn(jvmSharedMain)
+            dependencies {
+                implementation(libs.sqldelight.sqlite.driver)
+                implementation(libs.kotlinx.coroutines.swing)
+            }
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
