@@ -11,6 +11,8 @@ options:
 
 - Wasm target (faster, modern browsers): `./gradlew :webApp:wasmJsBrowserDevelopmentRun`
 - JS target (slower, supports older browsers): `./gradlew :webApp:jsBrowserDevelopmentRun`
+- Hosting: pushes to `main` build and deploy the prod bundles via `.github/workflows/deploy-web.yml` — see
+  `docs/web-deploy.md`.
 
 Before running the dev browser after npm dependencies have changed (after pulling changes to
 `webApp/build.gradle.kts`, or when the build fails with `Lock file was changed`), refresh the yarn lockfiles:

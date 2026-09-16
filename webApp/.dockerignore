@@ -1,0 +1,6 @@
+# Whitelist: only what the image copies, so the build context sent over SSH stays small
+*
+!nginx.conf
+!build/dist/wasmJs/productionExecutable/**
+!build/dist/js/productionExecutable/**
+build/dist/**/*.map

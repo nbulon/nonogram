@@ -21,6 +21,7 @@ out). Users solve nonogram puzzles, track progress, and optionally sync via Goog
 
 # Web production bundles (against prod Firebase)
 ./gradlew :webApp:wasmJsBrowserDistribution :webApp:jsBrowserDistribution -Pnonogram.env=prod
+# Web deploy: a push to main runs .github/workflows/deploy-web.yml (nginx container over SSH) — see docs/web-deploy.md
 
 # Desktop (JVM, Compose for Desktop) — dev by default, -Pnonogram.env=prod for the prod project
 ./gradlew :desktopApp:run
