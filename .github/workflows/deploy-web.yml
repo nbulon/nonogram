@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: dev
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
@@ -25,6 +25,8 @@ jobs:
           java-version: 21
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
