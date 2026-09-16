@@ -1,9 +1,14 @@
 package com.trainpaths.nonogram
 
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.trainpaths.nonogram.auth.AuthRepository
@@ -28,6 +33,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.context.startKoin
+import java.awt.GraphicsEnvironment
 
 fun main() {
     val dataDir = appDataDir(FirebaseDesktopConfig.DATA_DIR_NAME)
@@ -49,12 +55,33 @@ fun main() {
     }
 
     application {
+        val screen = GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration.bounds
+        val fullscreen = DpSize(screen.width.dp, screen.height.dp)
+        val state = rememberWindowState(
+            placement = WindowPlacement.Floating,
+            position = WindowPosition(0.dp, 0.dp),
+            size = fullscreen,
+        )
         Window(
             onCloseRequest = ::exitApplication,
             title = "Nonogram",
             icon = painterResource(Res.drawable.icon),
-            // Maximized by default; the size is what un-maximizing falls back to
-            state = rememberWindowState(placement = WindowPlacement.Maximized, size = DpSize(1100.dp, 800.dp)),
+            undecorated = true,
+            state = state,
+            onPreviewKeyEvent = { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.F11) {
+                    if (state.placement == WindowPlacement.Maximized) {
+                        state.placement = WindowPlacement.Floating
+                        state.position = WindowPosition(0.dp, 0.dp)
+                        state.size = fullscreen
+                    } else {
+                        state.placement = WindowPlacement.Maximized
+                    }
+                    true
+                } else {
+                    false
+                }
+            },
         ) {
             App(
                 menuViewModelFactory = { koinViewModel<MenuViewModel>() },
