@@ -47,25 +47,45 @@ class MenuViewModel(
         isLoading = loadAll
         launchGuarded(onError = { println("Menu: loading nonograms failed: ${it.message}") }) {
             try {
-                val uid = authRepository.currentUserUid.value
-                authorUid = uid
-                nonograms = sdk.getVisibleNonograms(uid.orEmpty())
-                if (uid != null) {
-                    val allProgress = sdk.getProgressForUser(uid)
-                    progressMap = allProgress
-                        .filter { it.board != null }
-                        .associate { it.nonogram.id to it.board!! }
-                    beatMap = allProgress
-                        .filter { it.beat > 0 }
-                        .associate { it.nonogram.id to it.beat }
-                } else {
-                    progressMap = emptyMap()
-                    beatMap = emptyMap()
-                }
+                loadNonograms()
             } finally {
                 isLoading = false
+            }
+        }
+    }
+
+    /**
+     * Runs [sync], then re-reads. The pull-to-refresh flag is set and cleared in this one coroutine
+     * rather than by another ViewModel's callback, which could fail to arrive and leave it spinning.
+     */
+    fun refresh(sync: suspend () -> Unit) {
+        if (isRefreshing) return
+        isRefreshing = true
+        launchGuarded(onError = { println("Menu: refresh failed: ${it.message}") }) {
+            try {
+                sync()
+                loadNonograms()
+            } finally {
                 isRefreshing = false
             }
+        }
+    }
+
+    private suspend fun loadNonograms() {
+        val uid = authRepository.currentUserUid.value
+        authorUid = uid
+        nonograms = sdk.getVisibleNonograms(uid.orEmpty())
+        if (uid != null) {
+            val allProgress = sdk.getProgressForUser(uid)
+            progressMap = allProgress
+                .filter { it.board != null }
+                .associate { it.nonogramId to it.board!! }
+            beatMap = allProgress
+                .filter { it.beat > 0 }
+                .associate { it.nonogramId to it.beat }
+        } else {
+            progressMap = emptyMap()
+            beatMap = emptyMap()
         }
     }
 
@@ -91,10 +111,6 @@ class MenuViewModel(
 
     fun incrementBeatCount(nonogramId: Long) {
         beatMap = beatMap + (nonogramId to (beatMap[nonogramId] ?: 0) + 1)
-    }
-
-    fun startRefresh() {
-        isRefreshing = true
     }
 }
 

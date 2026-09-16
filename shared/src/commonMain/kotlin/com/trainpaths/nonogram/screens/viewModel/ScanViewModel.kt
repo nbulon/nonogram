@@ -7,25 +7,19 @@ import androidx.lifecycle.ViewModel
 import com.trainpaths.nonogram.classes.sanitizeNameInput
 import com.trainpaths.nonogram.scan.DEFAULT_SCAN_SIDE
 import com.trainpaths.nonogram.scan.LumaMap
+import com.trainpaths.nonogram.scan.PickedImage
 import com.trainpaths.nonogram.scan.ScanOptions
 import com.trainpaths.nonogram.scan.decodeToLumaMap
 import com.trainpaths.nonogram.scan.defaultDimensions
 import com.trainpaths.nonogram.scan.otsuThreshold
 import com.trainpaths.nonogram.scan.toGrid
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Bigger than any image worth turning into a 50x50 grid, and past the point where decoding one is
- * a good idea on WASM — `decodeToImageBitmap` materializes the whole bitmap however carefully the
- * pixels are read back afterward.
+ * a good idea on a phone — the decoder materializes the whole bitmap however carefully the pixels
+ * are read back afterward.
  */
-private const val MAX_IMAGE_BYTES = 20 * 1024 * 1024
-
-/** One frame at 60Hz. */
-private const val SPINNER_FRAME_MS = 16L
+private const val MAX_IMAGE_BYTES = 20L * 1024 * 1024
 
 /**
  * Holds a picked image while the user tunes it into a grid.
@@ -78,18 +72,17 @@ class ScanViewModel : ViewModel() {
     val rows: Int get() = dimensions.first
     val cols: Int get() = dimensions.second
 
-    fun onImagePicked(bytes: ByteArray) {
+    fun onImagePicked(image: PickedImage) {
         if (isProcessing) return
         error = null
-        if (bytes.size > MAX_IMAGE_BYTES) {
+        if (image.sizeBytes > MAX_IMAGE_BYTES) {
             error = "That image is too large. Try one under 20 MB."
             return
         }
         isProcessing = true
         launchGuarded(onError = { error = it.message ?: "Could not read that image." }) {
             try {
-                delay(SPINNER_FRAME_MS.milliseconds)
-                val map = withContext(Dispatchers.Default) { bytes.decodeToLumaMap() }
+                val map = image.decodeToLumaMap()
                 lumaMap = map
                 sourceWidth = map.width
                 sourceHeight = map.height

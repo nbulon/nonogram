@@ -96,9 +96,8 @@ INSERT OR REPLACE INTO UserProgress(userUid, nonogramId, boardState, updatedAt, 
 VALUES (:userUid, :nonogramId, NULL, :updatedAt, COALESCE((SELECT beat FROM UserProgress WHERE userUid = :userUid AND nonogramId = :nonogramId), 0) + 1);
 
 selectProgressForUser:
-SELECT NonogramData.*, UserProgress.boardState, UserProgress.beat
-FROM NonogramData
-JOIN UserProgress ON UserProgress.nonogramId = NonogramData.id
+SELECT UserProgress.nonogramId, UserProgress.boardState, UserProgress.beat
+FROM UserProgress
 WHERE UserProgress.userUid = ?;
 
 mergeProgressInto:

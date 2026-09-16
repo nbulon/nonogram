@@ -18,10 +18,11 @@ Two things that will bite:
 
 ## Pipeline
 
-1. `ByteArray.decodeToLumaMap()` — `decodeToImageBitmap()`, then `readPixels` a band at a time into one reused buffer
-   (`BAND_BUDGET` ints), accumulating into a `LumaMap` of at most `WORKING_SIDE`
-   (256) on its longest side. Alpha is composited over **white**; without that a transparent PNG scans as a fully filled
-   grid.
+1. `PickedImage.decodeToLumaMap()` — per platform (see **Picker actuals**), reducing to a `LumaMap` of at most
+   `WORKING_SIDE` (256) on its longest side. Android: `decodeToImageBitmap()`, then `readPixels` a band at a time into
+   one reused buffer (`BAND_BUDGET` ints), off the main thread. Web: the browser decodes an `<img>` and downscales it
+   with `drawImage`, since the main thread is the only one there. Alpha is composited over **white** on both; without
+   that a transparent PNG scans as a fully filled grid.
 2. `LumaMap.otsuThreshold()` — the initial slider value.
 3. `defaultDimensions(width, height, side)` — aspect-preserving, longest side `side`. The size is the user's, not the
    pipeline's: `ScanViewModel.sideInput` starts at `DEFAULT_SCAN_SIDE` (30) and is editable *before* the pick as well as
@@ -44,25 +45,28 @@ on web `Dispatchers.Default` **is** the main thread.
 |                                      |                                                                                  |
 |--------------------------------------|----------------------------------------------------------------------------------|
 | `scan/LumaMap.kt`                    | `LumaMap`, `LumaAccumulator` (the box-downsample), `lumaOverWhite`, `scaledSize` |
-| `scan/ImageDecode.kt`                | `decodeToLumaMap` — the only part tests can't reach (needs a real image + Skia)  |
+| `scan/ImageDecode.kt`                | `expect class PickedImage` + `expect suspend decodeToLumaMap` — the only part tests can't reach |
 | `scan/ImageToGrid.kt`                | `ScanOptions`, `otsuThreshold`, `defaultDimensions`, `clampToGridSide`, `toGrid` |
-| `screens/ImagePicker.kt`             | `expect @Composable rememberImagePicker(onPicked, onError): () -> Unit`          |
+| `screens/ImagePicker.kt`             | `expect @Composable rememberImagePicker(onPicked: (PickedImage) -> Unit, onError): () -> Unit` |
 | `screens/viewModel/ScanViewModel.kt` | tuning state + `previewGrid`; `MAX_IMAGE_BYTES` = 20 MB                          |
 | `screens/GenScanScreen.kt`           | the screen; `GridPreview` is a plain `Canvas`, not `Board`                       |
 | `commonTest/scan/ImageToGridTest.kt` | everything except the decode                                                     |
 
-Decoding is **not** platform-specific: `decodeToImageBitmap` and `readPixels` are both in the common API surface of
-`compose.ui:ui-graphics`. Only acquiring the bytes needs `expect`/`actual`.
+Both acquiring and decoding the image are `expect`/`actual`: `PickedImage` keeps the image in whatever form the
+platform produced it (encoded bytes on Android, the `Blob` on web), and `decodeToLumaMap` is where the two differ —
+see `docs/web-architecture.md → One thread, and what that costs` for why web cannot use Compose's decoder.
 
 ## Picker actuals
 
 - **android**: `ActivityResultContracts.PickVisualMedia` + `ContentResolver` on `Dispatchers.IO`. No manifest permission
   needed. Required adding `activity-compose` to `shared`'s androidMain — it was only on `androidApp`.
-- **web**: one actual in `webMain`, **no js/wasmJs split**. The split `createDbWorkerDriver` needs does not apply: the
-  stdlib's webMain view no longer ships `org.w3c`, so `kotlinx-browser` (now declared explicitly) is the sole DOM
-  provider for both targets and `FileReader.result` is one unified `JsAny?`. A detached `<input type="file">`,
-  `addEventListener("change", …)` rather than
-  `onchange` (that one's type does differ across targets).
+  `ImageDecode.android.kt` runs Compose's `decodeToImageBitmap` + banded `readPixels` on `Dispatchers.Default`.
+- **web**: one actual each in `webMain`, **no js/wasmJs split**. The split `createDbWorkerDriver` needs does not apply:
+  the stdlib's webMain view no longer ships `org.w3c`, so `kotlinx-browser` (now declared explicitly) is the sole DOM
+  provider for both targets. A detached `<input type="file">`, `addEventListener("change", …)` rather than `onchange`
+  (that one's type does differ across targets), and the picked `File` goes straight into `PickedImage` — no
+  `FileReader` copy. `ImageDecode.web.kt` loads it into an `<img>` (again `addEventListener`, for the same reason) and
+  reads the downscaled pixels back from a canvas.
 
 A dismissed picker is silent — no pick, no error — like the canceled sign-in in
 `GoogleSignInSection`.

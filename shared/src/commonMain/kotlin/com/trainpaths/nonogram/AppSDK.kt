@@ -13,6 +13,11 @@ import com.trainpaths.nonogram.classes.PublishStatus
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.seconds
+
+/** [AppSDK.db] holds its mutex across driver creation, so a driver that never comes up would wedge every call. */
+private val DRIVER_TIMEOUT = 20.seconds
 
 class AppSDK(private val databaseFactory: DatabaseFactory) {
     private val mutex = Mutex()
@@ -20,7 +25,8 @@ class AppSDK(private val databaseFactory: DatabaseFactory) {
 
     private suspend fun db(): Database =
         database ?: mutex.withLock {
-            database ?: Database(databaseFactory.createDriver()).also { database = it }
+            database ?: Database(withTimeout(DRIVER_TIMEOUT) { databaseFactory.createDriver() })
+                .also { database = it }
         }
 
     private suspend fun <T> onDb(block: suspend Database.() -> T): T =

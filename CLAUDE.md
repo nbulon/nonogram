@@ -61,9 +61,11 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
   `generateAsync` is on so the web worker driver can be async). Builds its `Database` lazily behind a mutex on first use
   so the constructor itself stays synchronous for DI. It also **owns the dispatcher**: every method hops once through
   `dbDispatcher` (`cache/DatabaseFactory.kt`; `Dispatchers.IO` on Android where the driver blocks,
-  `EmptyCoroutineContext` on web where `Dispatchers.Default` *is* the main thread), driver creation included. Callers
+  `EmptyCoroutineContext` on web where `Dispatchers.Default` *is* the main thread), driver creation included, which
+  it also times out (`DRIVER_TIMEOUT`) because it happens under a mutex every other call waits on. Callers
   just `suspend` — do not wrap an `AppSDK` call in a `withContext` of your own. The one thing in a ViewModel that still
-  earns its own `Dispatchers.Default` is `GenViewModel`'s Solver run.
+  earns its own `Dispatchers.Default` is `GenViewModel`'s Solver run — and on web even that is the UI thread; see
+  `docs/web-architecture.md → One thread, and what that costs` before adding CPU-bound work.
 - **`cache/Database`** — internal class wrapping SQLDelight-generated `NonogramDb`. Maps DB rows to domain types. Not
   accessed directly outside `AppSDK`.
 - **`cache/DatabaseFactory`** — `suspend fun createDriver(): SqlDriver`, implemented per platform:
@@ -171,11 +173,19 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
   `currentUserUid` is an anomaly (auth not initialized), a null `currentFirebaseUid` is just a guest.
 
   **When sync runs.** `syncAll` fires once from `AppContent`'s app-start `LaunchedEffect`, and after that only when the
-  user pull-to-refreshes the menu (`MenuScreen`'s
-  `PullToRefreshBox` → `MenuViewModel.refresh`). Entering `MenuRoute` does **not** sync — it calls
-  `MenuViewModel.reload()`, a silent local-DB re-read with no spinner, so puzzles just authored in the generator still
-  appear. `MenuViewModel` therefore has two flags: `isLoading` (full-screen spinner, cold start and sign-in/sign-out
-  only, via `loadAll()`) and `isRefreshing` (the pull-to-refresh indicator).
+  user pull-to-refreshes the menu (`MenuScreen`'s `PullToRefreshBox` → `MenuViewModel.refresh(sync)`, which takes the
+  pass itself as a suspend lambda — `authViewModel::syncAllNow` — so `isRefreshing` is set and cleared inside one
+  coroutine; a callback from another ViewModel that never arrived used to leave it spinning forever). Entering
+  `MenuRoute` does **not** sync — it calls `MenuViewModel.reload()`, a silent local-DB re-read with no spinner, so
+  puzzles just authored in the generator still appear. `MenuViewModel` therefore has two flags: `isLoading`
+  (full-screen spinner, cold start and sign-in/sign-out only, via `reload(loadAll = true)`) and `isRefreshing` (the
+  pull-to-refresh indicator).
+
+  **Every remote pass is bounded.** `syncAllNow`, `retryOwnNonograms` and the post-sign-in sync wrap their work in
+  `withTimeoutOrNull(SYNC_TIMEOUT)`, and the fire-and-forget `syncAll`/`retryOwnNonograms`/`signOut` release their
+  `onComplete` under `NonCancellable + Dispatchers.Main`. Both exist because a Firestore promise on web can neither be
+  cancelled nor relied on to settle — see `docs/web-architecture.md → One thread, and what that costs`. The two
+  sync services' `gated`/`logged` wrappers rethrow `CancellationException` so the timeout actually unwinds.
 
 ### Navigation
 

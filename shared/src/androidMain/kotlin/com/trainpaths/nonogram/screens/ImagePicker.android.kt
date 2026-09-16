@@ -9,13 +9,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
+import com.trainpaths.nonogram.scan.PickedImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
 actual fun rememberImagePicker(
-    onPicked: (ByteArray) -> Unit,
+    onPicked: (PickedImage) -> Unit,
     onError: (String) -> Unit,
 ): () -> Unit {
     val context = LocalContext.current
@@ -32,7 +33,9 @@ actual fun rememberImagePicker(
                 runCatching { context.contentResolver.openInputStream(uri)?.readBytes() }
             }
             bytes.fold(
-                onSuccess = { if (it == null) failed("Could not open that image.") else picked(it) },
+                onSuccess = {
+                    if (it == null) failed("Could not open that image.") else picked(PickedImage(it))
+                },
                 onFailure = { failed(it.message ?: "Could not open that image.") },
             )
         }

@@ -242,32 +242,19 @@ internal class Database(driver: SqlDriver) {
     )
 
     private fun mapProgress(
-        id: Long,
-        difficulty: String,
-        solution: String,
-        authorUid: String,
-        status: Long,
-        updatedAt: Long,
-        name: String?,
+        nonogramId: Long,
         boardState: String?,
-        beat: Long
+        beat: Long,
     ): NonogramProgress = NonogramProgress(
-        nonogram = Nonogram(
-            id = id,
-            difficulty = difficulty.toDifficulty(),
-            solution = decodeSolution(solution),
-            name = name,
-            authorUid = authorUid,
-            updatedAt = updatedAt,
-            publishStatus = status.toPublishStatus(),
-        ),
+        nonogramId = nonogramId,
         board = boardState?.toSolutionOrNull(),
-        beat = beat
+        beat = beat,
     )
 }
 
+/** Progress columns only: the menu keys these by id and never needs the puzzle decoded again. */
 data class NonogramProgress(
-    val nonogram: Nonogram,
+    val nonogramId: Long,
     val board: List<List<Int>>?,
     val beat: Long = 0
 )
