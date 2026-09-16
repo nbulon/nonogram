@@ -1,6 +1,7 @@
 package com.trainpaths.nonogram.sync
 
 import com.trainpaths.nonogram.classes.Difficulty
+import com.trainpaths.nonogram.classes.MAX_NONOGRAM_NAME_LENGTH
 import com.trainpaths.nonogram.classes.MAX_NONOGRAM_SIDE
 import com.trainpaths.nonogram.classes.PublishStatus
 import com.trainpaths.nonogram.classes.toSolutionJson
@@ -53,6 +54,16 @@ class NonogramDocumentTest {
         assertNull(nonogram.name)
         assertEquals("", nonogram.authorUid)
         assertEquals(PublishStatus.NONE, nonogram.publishStatus)
+        assertTrue(skipped.isEmpty())
+    }
+
+    @Test
+    fun normalizesTheNameOnIngest() {
+        val oversized = assertNotNull(document(name = "x".repeat(200)).parse())
+        val blank = assertNotNull(document(name = "   ").parse())
+
+        assertEquals(MAX_NONOGRAM_NAME_LENGTH, oversized.name?.length)
+        assertNull(blank.name)
         assertTrue(skipped.isEmpty())
     }
 
