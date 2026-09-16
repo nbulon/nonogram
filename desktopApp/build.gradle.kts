@@ -18,6 +18,7 @@ kotlin {
                 implementation(projects.shared)
 
                 implementation(compose.desktop.currentOs)
+                implementation(libs.compose.components.resources)
                 implementation(libs.koin.core)
                 implementation(libs.koin.compose.viewmodel)
                 implementation(libs.kotlinx.coroutines.swing)
@@ -26,16 +27,26 @@ kotlin {
     }
 }
 
+compose.resources {
+    packageOfResClass = "com.trainpaths.nonogram.desktop.resources"
+    generateResClass = always
+}
+
 compose.desktop {
     application {
         mainClass = "com.trainpaths.nonogram.MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
-            packageName = "Nonogram"
-            packageVersion = "1.0.7"
+            packageName = "nonogram"
+            packageVersion = "1.0.0"
             // sqlite-jdbc needs java.sql; Firestore's grpc/netty stack reaches for Unsafe
             modules("java.sql", "jdk.unsupported")
+
+            val iconDir = project.file("src/desktopMain/composeResources/drawable")
+            linux { iconFile.set(iconDir.resolve("icon.png")) }
+            windows { iconFile.set(iconDir.resolve("icon.ico")) }
+            macOS { iconFile.set(iconDir.resolve("icon.icns")) }
         }
 
         // Firestore's grpc stack under ProGuard is not worth the keep rules
