@@ -3,9 +3,12 @@ package com.trainpaths.nonogram
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.trainpaths.nonogram.auth.AuthRepository
+import com.trainpaths.nonogram.desktop.resources.Res
+import com.trainpaths.nonogram.desktop.resources.icon
 import com.trainpaths.nonogram.di.appModule
 import com.trainpaths.nonogram.di.desktopModule
 import com.trainpaths.nonogram.firebase.FirebaseDesktop
@@ -21,6 +24,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.context.startKoin
@@ -48,7 +52,9 @@ fun main() {
         Window(
             onCloseRequest = ::exitApplication,
             title = "Nonogram",
-            state = rememberWindowState(size = DpSize(1100.dp, 800.dp)),
+            icon = painterResource(Res.drawable.icon),
+            // Maximized by default; the size is what un-maximizing falls back to
+            state = rememberWindowState(placement = WindowPlacement.Maximized, size = DpSize(1100.dp, 800.dp)),
         ) {
             App(
                 menuViewModelFactory = { koinViewModel<MenuViewModel>() },
