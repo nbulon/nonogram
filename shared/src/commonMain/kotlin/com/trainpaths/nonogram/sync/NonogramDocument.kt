@@ -2,6 +2,7 @@ package com.trainpaths.nonogram.sync
 
 import com.trainpaths.nonogram.classes.Nonogram
 import com.trainpaths.nonogram.classes.isWellFormedGrid
+import com.trainpaths.nonogram.classes.normalizeNonogramName
 import com.trainpaths.nonogram.classes.toSolutionOrNull
 import com.trainpaths.nonogram.util.toDifficulty
 import com.trainpaths.nonogram.util.toPublishStatus
@@ -36,7 +37,7 @@ internal fun NonogramDocument.toNonogram(onSkip: (String) -> Unit): Nonogram? {
         id = nonogramId,
         difficulty = difficulty.toDifficulty(),
         solution = grid,
-        name = name,
+        name = name?.let(::normalizeNonogramName),
         authorUid = authorUid ?: "",
         updatedAt = timestamp,
         publishStatus = publishStatus.toPublishStatus(),
