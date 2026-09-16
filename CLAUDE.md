@@ -280,7 +280,10 @@ silently disappears. Icons come from the hand-built `icons/` package of `ImageVe
   in between (codec, DB column, both `SyncService`s) never inspect the values.
 - **`cache/SeedPuzzles.kt`** — the built-in puzzles, **generated**: `./gradlew :seedTool:run` rewrites it from every
   `APPROVED` puzzle in the *dev* Firestore project, so it is a projection with no state of its own and each seed's id
-  is its dev document id. `AppInitializer.initializeApp` calls `AppSDK.seedIfEmpty()` once at startup, before
+  is its dev document id. Each solution is stored as a `0`/`1` row string (`SeedPuzzle.rows`, one row per line,
+  decoded by `String.toBinaryGrid()` in `classes/SolutionCodec.kt`) rather than nested `listOf`s, so the file's
+  static initializer holds one string constant per puzzle instead of one vararg element per cell — that is what
+  kept it under the JVM method-size limit. `AppInitializer.initializeApp` calls `AppSDK.seedIfEmpty()` once at startup, before
   `AuthRepository.initialize()` and so before any ViewModel reads the table; the guard is a `SELECT count(*)`, since
   an empty table is the first launch (and the one web storage eviction leaves behind). See `docs/seeding.md` — do not
   hand-edit the file.

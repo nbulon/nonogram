@@ -11,24 +11,24 @@ internal val SEED_FIXTURE: List<SeedPuzzle> = listOf(
         id = 4_215_003_001L,
         name = "Plus",
         difficulty = "EASY",
-        solution = listOf(
-            listOf(0, 0, 1, 0, 0),
-            listOf(0, 0, 1, 0, 0),
-            listOf(1, 1, 1, 1, 1),
-            listOf(0, 0, 1, 0, 0),
-            listOf(0, 0, 1, 0, 0),
-        ),
+        rows = """
+            00100
+            00100
+            11111
+            00100
+            00100
+        """.trimIndent(),
     ),
     SeedPuzzle(
         id = 4_215_003_002L,
         name = null,
         difficulty = "MEDIUM",
-        solution = listOf(
-            listOf(1, 1, 1, 1, 1),
-            listOf(1, 0, 0, 0, 0),
-            listOf(1, 1, 1, 0, 0),
-            listOf(1, 0, 0, 0, 0),
-            listOf(1, 1, 1, 1, 1),
-        ),
+        rows = """
+            11111
+            10000
+            11100
+            10000
+            11111
+        """.trimIndent(),
     ),
 )

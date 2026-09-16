@@ -20,3 +20,12 @@ internal fun String.toSolutionOrNull(onError: (String) -> Unit = {}): List<List<
         onError(e.message.orEmpty())
         null
     }
+
+/** The seed encoding: one row per line, `0`/`1` per cell. Throws on anything else — seeds are compile-time data. */
+internal fun String.toBinaryGrid(): List<List<Int>> =
+    lines().map { row ->
+        row.map { c ->
+            require(c == '0' || c == '1') { "cell '$c' in row \"$row\"" }
+            c - '0'
+        }
+    }
