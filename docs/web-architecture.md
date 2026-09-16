@@ -31,6 +31,33 @@ Because `AuthRepository.initialize()` is now async, `MenuViewModel`'s `init { lo
 `LoadingScreen()` until `AuthViewModel.authState != INITIALIZING`, so ViewModels are only constructed once auth has
 resolved.
 
+## One thread, and what that costs
+
+js and wasmJs have a single thread, and it is the one that draws. `Dispatchers.Default` is that thread,
+`Dispatchers.IO` does not exist, and `dbDispatcher` is `EmptyCoroutineContext` for the same reason — there is nowhere
+to hop *to*. A `withContext(Dispatchers.Default)` written for Android's benefit buys web nothing, and anything
+genuinely CPU-bound (the Solver, most visibly) freezes the UI for as long as it runs. The app deliberately runs no
+workers of its own beyond the database one; what follows is how it stays usable without them.
+
+- **Nothing may pin a spinner.** `kotlinx.coroutines.await` on a JS `Promise` cannot cancel the promise, and the
+  Firestore JS SDK does not promise to settle one: an offline `setDoc` queues until the client is back online, a
+  `getDocs` retries with backoff. So `AuthViewModel` bounds every remote pass with `withTimeoutOrNull(SYNC_TIMEOUT)`
+  (`syncAllNow` is the awaitable form the menu uses), releases its `onComplete` callbacks under
+  `NonCancellable + Dispatchers.Main` (a plain `withContext` in a `finally` rethrows on a cancelled job and skips the
+  callback), and `MenuViewModel.refresh(sync)` sets and clears `isRefreshing` inside one coroutine rather than
+  trusting a callback from another ViewModel to arrive. For the timeout to unwind, `gated` (web) and `logged`
+  (Android) rethrow `CancellationException` instead of swallowing it into a fallback. `AppSDK` likewise times out
+  driver creation, which happens under a mutex every other database call waits on.
+- **Image decode is the browser's.** `scan/ImageDecode.kt` is `expect`: Compose's `decodeToImageBitmap` +
+  `readPixels` is synchronous and would decode a 12 MP photo on the UI thread. The web actual hands the picked
+  `File` — already a `Blob`, held as `PickedImage` so the bytes never enter Kotlin — to an `<img>`, lets the browser
+  decode it off-thread, and `drawImage`s it into a canvas *already sized to `WORKING_SIDE`*, so only the finished
+  256-pixel-wide image crosses back into Kotlin. The resample is therefore the browser's rather than
+  `LumaAccumulator`'s box filter, so a web scan is not bit-identical to an Android one; both feed the same
+  interactive threshold.
+- **Don't decode a grid you will not draw.** Every `solution` and `boardState` is JSON parsed on the UI thread by
+  `Database`'s row mappers; `selectProgressForUser` selects progress columns only for exactly this reason.
+
 ## Persistence: OPFS via a custom worker
 
 SQLDelight's documented web worker setup uses `sql.js`, which is in-memory only — a reload wipes all data. Instead,

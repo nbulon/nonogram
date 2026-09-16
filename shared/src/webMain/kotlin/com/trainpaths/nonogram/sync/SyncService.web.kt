@@ -23,6 +23,7 @@ import com.trainpaths.nonogram.firebase.query3
 import com.trainpaths.nonogram.firebase.setDoc
 import com.trainpaths.nonogram.firebase.setDocMerged
 import com.trainpaths.nonogram.firebase.where
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.await
 import kotlin.js.ExperimentalWasmJsInterop
 import kotlin.js.toJsNumber
@@ -53,10 +54,12 @@ class FirebaseWebSyncService(private val sdk: AppSDK) : SyncService {
     /**
      * The session gate plus the best-effort contract, in one place: no override can forget either.
      * Reports [label] and falls back to [fallback] both when there is no live session and when the
-     * call itself fails.
+     * call itself fails. Cancellation is rethrown, so a timed-out sync stops instead of walking on.
      */
     private suspend inline fun <T> gated(firebaseUid: String, label: String, fallback: T, block: () -> T): T = try {
         if (!sessionMatches(firebaseUid)) fallback else block()
+    } catch (e: CancellationException) {
+        throw e
     } catch (e: Throwable) {
         println("$LOG_TAG: $label: ${e.message}")
         fallback
@@ -137,6 +140,8 @@ class FirebaseWebSyncService(private val sdk: AppSDK) : SyncService {
                 )
             ).await()
             mergeRemoteNonograms(sdk, firebaseUid, since, parseNonograms(snapshot))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             println("$LOG_TAG: pull public nonograms for puzzle list failed: ${e.message}")
             null

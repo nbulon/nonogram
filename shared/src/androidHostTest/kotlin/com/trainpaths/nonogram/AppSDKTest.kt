@@ -324,7 +324,7 @@ class AppSDKTest {
 
         val progress = sdk.getProgressForUser("uid-dave")
         assertEquals(1, progress.size)
-        assertEquals(nonogramId, progress[0].nonogram.id)
+        assertEquals(nonogramId, progress[0].nonogramId)
         assertEquals(board, progress[0].board)
     }
 
