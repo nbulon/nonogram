@@ -48,6 +48,12 @@ workers of its own beyond the database one; what follows is how it stays usable 
   trusting a callback from another ViewModel to arrive. For the timeout to unwind, `gated` (web) and `logged`
   (Android) rethrow `CancellationException` instead of swallowing it into a fallback. `AppSDK` likewise times out
   driver creation, which happens under a mutex every other database call waits on.
+- **A wheel scroll never lets go.** Compose dispatches mouse-wheel scrolling through nested scroll as
+  `NestedScrollSource.UserInput`, the same as a finger drag, but does not fling afterwards (the default fling
+  behaviour is skipped for the wheel). Anything that pairs `onPostScroll` with a release in `onPreFling` —
+  `PullToRefreshBox`, whose indicator otherwise sticks at whatever distance a wheel-up at the top of the list pulled
+  it to — must therefore be gated to touch; `MenuScreen`'s `pullToRefreshByTouchOnly` swallows the overflow unless a
+  non-mouse pointer is down.
 - **Image decode is the browser's.** `scan/ImageDecode.kt` is `expect`: Compose's `decodeToImageBitmap` +
   `readPixels` is synchronous and would decode a 12 MP photo on the UI thread. The web actual hands the picked
   `File` — already a `Blob`, held as `PickedImage` so the bytes never enter Kotlin — to an `<img>`, lets the browser
