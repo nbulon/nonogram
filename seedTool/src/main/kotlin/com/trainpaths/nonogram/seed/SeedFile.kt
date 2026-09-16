@@ -16,6 +16,8 @@ internal fun renderSeedFile(seeds: List<Seed>, projectId: String): String =
         appendLine("// commit the result. See docs/seeding.md.")
         appendLine("package com.trainpaths.nonogram.cache")
         appendLine()
+        appendLine("import com.trainpaths.nonogram.classes.toBinaryGrid")
+        appendLine()
         appendLine("/**")
         appendLine(" * One built-in puzzle, inserted by `AppSDK.seedIfEmpty`.")
         appendLine(" *")
@@ -28,8 +30,11 @@ internal fun renderSeedFile(seeds: List<Seed>, projectId: String): String =
         appendLine("    val id: Long,")
         appendLine("    val name: String?,")
         appendLine("    val difficulty: String,")
-        appendLine("    val solution: List<List<Int>>,")
-        appendLine(")")
+        appendLine("    /** One row per line, `0`/`1` per cell. */")
+        appendLine("    val rows: String,")
+        appendLine(") {")
+        appendLine("    val solution: List<List<Int>> get() = rows.toBinaryGrid()")
+        appendLine("}")
         appendLine()
         appendLine("internal val SEED_PUZZLES: List<SeedPuzzle> = listOf(")
         seeds.forEach { seed ->
@@ -37,9 +42,9 @@ internal fun renderSeedFile(seeds: List<Seed>, projectId: String): String =
             appendLine("        id = ${seed.id}L,")
             appendLine("        name = ${seed.name?.let { "\"${it.escaped()}\"" } ?: "null"},")
             appendLine("        difficulty = \"${seed.difficulty}\",")
-            appendLine("        solution = listOf(")
-            seed.solution.forEach { row -> appendLine("            listOf(${row.joinToString(", ")}),") }
-            appendLine("        ),")
+            appendLine("        rows = \"\"\"")
+            seed.solution.forEach { row -> appendLine("            " + row.joinToString("")) }
+            appendLine("        \"\"\".trimIndent(),")
             appendLine("    ),")
         }
         appendLine(")")
