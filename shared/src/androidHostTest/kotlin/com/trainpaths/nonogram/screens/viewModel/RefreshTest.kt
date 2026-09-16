@@ -1,5 +1,7 @@
 package com.trainpaths.nonogram.screens.viewModel
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.russhwolf.settings.MapSettings
 import com.trainpaths.nonogram.AppSDK
 import com.trainpaths.nonogram.TestDatabaseFactory
@@ -11,8 +13,8 @@ import com.trainpaths.nonogram.sync.SyncService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.job
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -61,11 +63,11 @@ class RefreshTest {
     fun refresh_clearsTheIndicatorWhenTheSyncFails() = runTest(dispatcher) {
         authRepository.initialize()
         val viewModel = MenuViewModel(sdk, authRepository, SettingsRepository(MapSettings()))
-        advanceUntilIdle()
+        viewModel.awaitIdle()
 
         viewModel.refresh { error("no network") }
         assertTrue(viewModel.isRefreshing)
-        advanceUntilIdle()
+        viewModel.awaitIdle()
 
         assertFalse(viewModel.isRefreshing)
     }
@@ -74,29 +76,39 @@ class RefreshTest {
     fun refresh_ignoresASecondPullWhileOneIsRunning() = runTest(dispatcher) {
         authRepository.initialize()
         val viewModel = MenuViewModel(sdk, authRepository, SettingsRepository(MapSettings()))
-        advanceUntilIdle()
+        viewModel.awaitIdle()
         var runs = 0
 
         viewModel.refresh { runs++ }
         viewModel.refresh { runs++ }
-        advanceUntilIdle()
+        viewModel.awaitIdle()
 
         assertEquals(1, runs)
         assertFalse(viewModel.isRefreshing)
     }
 }
 
+/**
+ * Waits for the ViewModel's coroutines to finish. `advanceUntilIdle` is not enough: `AppSDK` hops to
+ * `Dispatchers.IO`, a real thread the test scheduler knows nothing about.
+ */
+private suspend fun ViewModel.awaitIdle() {
+    viewModelScope.coroutineContext.job.children.forEach { it.join() }
+}
+
 /** Every remote call hangs, the way a Firestore promise that never settles does. */
 private class HangingSyncService : SyncService {
-    override suspend fun pushProgress(firebaseUid: String, nonogramId: Long, boardState: String?, updatedAt: Long) = hang()
+    override suspend fun pushProgress(firebaseUid: String, nonogramId: Long, boardState: String?, updatedAt: Long) =
+        hang()
+
     override suspend fun hasRemoteProgress(firebaseUid: String): Boolean = hang()
     override suspend fun uploadAllLocalProgress(firebaseUid: String) = hang()
     override suspend fun pullAllProgress(firebaseUid: String) = hang()
     override suspend fun pullAndMergeAllProgress(firebaseUid: String) = hang()
     override suspend fun pushNonogram(firebaseUid: String, nonogram: Nonogram, writePublishStatus: Boolean) = hang()
     override suspend fun uploadAllLocalNonograms(firebaseUid: String) = hang()
-    override suspend fun pullPublicNonogramsSince(firebaseUid: String?, since: Long): Long? = hang()
-    override suspend fun pullOwnedNonograms(firebaseUid: String, since: Long): Long? = hang()
+    override suspend fun pullPublicNonogramsSince(firebaseUid: String?, since: Long): Long = hang()
+    override suspend fun pullOwnedNonograms(firebaseUid: String, since: Long): Long = hang()
     override suspend fun requestPublish(firebaseUid: String, nonogram: Nonogram): Boolean = hang()
     override suspend fun deleteNonogram(firebaseUid: String, nonogramId: Long): Boolean = hang()
     override suspend fun fetchModerationGate(firebaseUid: String) = hang()
