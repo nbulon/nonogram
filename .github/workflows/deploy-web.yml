@@ -2,7 +2,7 @@ name: Deploy web
 
 on:
   push:
-    branches: [ deploy ]
+    branches: [ main ]
   workflow_dispatch:
 
 concurrency:
@@ -36,8 +36,7 @@ jobs:
 
       - name: Build image on the host and restart the container
         env:
-          # Build context is streamed to the host's Docker daemon over SSH; the image never leaves the host
-          DOCKER_HOST: ssh://${{ vars.DEPLOY_SSH_TARGET }}
+          DOCKER_HOST: ssh://${{ vars.SSH_TARGET }}
           WEB_PORT: ${{ vars.WEB_PORT || '8080' }}
         run: |
           docker compose --project-name nonogram-web -f webApp/compose.yml up -d --build --remove-orphans
