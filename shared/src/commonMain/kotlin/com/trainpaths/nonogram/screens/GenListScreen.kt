@@ -21,10 +21,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.trainpaths.nonogram.classes.CardStatus
 import com.trainpaths.nonogram.classes.Nonogram
 import com.trainpaths.nonogram.classes.NonogramCard
 import com.trainpaths.nonogram.classes.NonogramGrid
+import com.trainpaths.nonogram.classes.cardStatus
+import com.trainpaths.nonogram.filter.FilterMenuButton
 import com.trainpaths.nonogram.navigation.AppBarMode
 import com.trainpaths.nonogram.navigation.TopAppBar
 import com.trainpaths.nonogram.AppButton
@@ -44,6 +45,7 @@ fun GenListScreen(
     onNewClick: () -> Unit,
     onScanClick: () -> Unit,
     onEditClick: (Nonogram) -> Unit,
+    onMoreFilters: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -54,6 +56,16 @@ fun GenListScreen(
             mode = AppBarMode.GENERATOR,
             onSwapMode = { onSwap() },
             swapTutorialStep = TutorialStep.GENLIST_SWAP_TO_PUZZLES,
+            navigationContent = {
+                Box(modifier = Modifier.tutorialAnchor(TutorialStep.GENLIST_FILTER)) {
+                    FilterMenuButton(
+                        entries = genViewModel.filterEntries,
+                        state = genViewModel.filterSort,
+                        onApply = genViewModel::applyFilterSort,
+                        onMore = onMoreFilters,
+                    )
+                }
+            },
         )
 
         Column(modifier = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxSize()) {
@@ -124,19 +136,23 @@ fun GenListScreen(
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
                 }
+            } else if (genViewModel.visibleNonograms.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "No puzzles match",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
             } else {
                 NonogramGrid {
-                    itemsIndexed(genViewModel.myNonograms) { index, nonogram ->
+                    itemsIndexed(genViewModel.visibleNonograms) { index, nonogram ->
                         NonogramCard(
                             nonogram = nonogram,
                             modifier = Modifier.tutorialAnchor(
                                 TutorialStep.GENLIST_EDIT.takeIf { index == 0 }
                             ),
-                            status = when {
-                                nonogram.isPublic -> CardStatus.PUBLISHED
-                                !nonogram.isKnownValid -> CardStatus.INVALID
-                                else -> CardStatus.UNPUBLISHED
-                            },
+                            status = nonogram.cardStatus,
                             onClick = { onEditClick(nonogram) },
                         )
                     }

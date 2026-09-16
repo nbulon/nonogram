@@ -73,6 +73,10 @@ enum class TutorialStep(val title: String, val text: String) {
         title = "Edit a puzzle",
         text = "Tap one of your puzzles to open it in the editor.",
     ),
+    GENLIST_FILTER(
+        title = "Filter and sort",
+        text = "Narrow your puzzles by status, name or size, or change the order.",
+    ),
     GENLIST_SWAP_TO_PUZZLES(
         title = "Back to puzzles",
         text = "Same button in reverse: takes you back to the puzzle list.",

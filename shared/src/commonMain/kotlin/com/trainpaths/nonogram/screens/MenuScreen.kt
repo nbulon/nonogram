@@ -33,6 +33,7 @@ fun MenuScreen(
     onRefresh: () -> Unit,
     onNonogramClick: (Nonogram) -> Unit,
     onGenClick: () -> Unit,
+    onMoreFilters: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -49,6 +50,7 @@ fun MenuScreen(
                         entries = viewModel.filterEntries,
                         state = viewModel.filterSort,
                         onApply = viewModel::applyFilterSort,
+                        onMore = onMoreFilters,
                     )
                 }
             },

@@ -411,7 +411,7 @@ fun NameField(
     )
 }
 
-/** A grid-side input: digits only, with the allowed range as its hint. Shared with `GenScanScreen`. */
+/** A grid-side input: digits only, with the allowed range as its hint. Shared with `GenScanScreen` and `FilterScreen`. */
 @Composable
 fun SizeField(
     value: String,

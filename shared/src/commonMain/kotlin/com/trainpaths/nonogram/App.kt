@@ -24,6 +24,7 @@ import com.trainpaths.nonogram.auth.AuthState
 import com.trainpaths.nonogram.dialogs.PlayConfirmDialog
 import com.trainpaths.nonogram.dialogs.WinConfirmDialog
 import com.trainpaths.nonogram.navigation.AdminRoute
+import com.trainpaths.nonogram.navigation.FilterRoute
 import com.trainpaths.nonogram.navigation.GameRoute
 import com.trainpaths.nonogram.navigation.GenConfRoute
 import com.trainpaths.nonogram.navigation.GenListRoute
@@ -36,6 +37,7 @@ import com.trainpaths.nonogram.navigation.PlayDialogRoute
 import com.trainpaths.nonogram.navigation.SettingsRoute
 import com.trainpaths.nonogram.navigation.WinDialogRoute
 import com.trainpaths.nonogram.screens.AdminScreen
+import com.trainpaths.nonogram.screens.FilterScreen
 import com.trainpaths.nonogram.screens.GameScreen
 import com.trainpaths.nonogram.screens.GenConfScreen
 import com.trainpaths.nonogram.screens.GenScanScreen
@@ -158,6 +160,7 @@ private fun AppContent(
                         onGenClick = {
                             navController.navigate(GenListRoute)
                         },
+                        onMoreFilters = { navController.navigate(FilterRoute(generator = false)) },
                     )
                 }
                 composable<GenListRoute> {
@@ -187,7 +190,24 @@ private fun AppContent(
                             genViewModel.loadForEdit(nonogram)
                             navController.navigate(GeneratorRoute)
                         },
+                        onMoreFilters = { navController.navigate(FilterRoute(generator = true)) },
                     )
+                }
+                composable<FilterRoute> { entry ->
+                    val route: FilterRoute = entry.toRoute()
+                    if (route.generator) {
+                        FilterScreen(
+                            state = genViewModel.filterSort,
+                            onChange = genViewModel::applyFilterSort,
+                            onBack = { navController.popBackStack() },
+                        )
+                    } else {
+                        FilterScreen(
+                            state = menuViewModel.filterSort,
+                            onChange = menuViewModel::applyFilterSort,
+                            onBack = { navController.popBackStack() },
+                        )
+                    }
                 }
                 composable<GenConfRoute> { entry ->
                     val route: GenConfRoute = entry.toRoute()

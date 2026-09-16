@@ -1,6 +1,8 @@
 package com.trainpaths.nonogram.filter
 
+import com.trainpaths.nonogram.classes.CardStatus
 import com.trainpaths.nonogram.classes.Difficulty
+import com.trainpaths.nonogram.classes.cardStatus
 
 object NonogramFilters {
 
@@ -13,6 +15,17 @@ object NonogramFilters {
         },
         ascending = compareBy { it.difficulty.ordinal },
     )
+
+    val STATUS = FilterAttribute(
+        label = "Status",
+        options = CardStatus.entries.map { status ->
+            FilterOption(status.label) { it.cardStatus == status }
+        },
+        ascending = compareBy { it.cardStatus.ordinal },
+    )
+
+    /** The generator list's entries: one user's own puzzles, so ownership is not a question there. */
+    val GENERATOR: List<FilterEntry> = listOf(STATUS)
 
     fun forUser(authorUid: String?): List<FilterEntry> = listOf(
         DIFFICULTY,
