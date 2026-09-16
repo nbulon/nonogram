@@ -93,12 +93,14 @@ object FirebaseWeb {
         publishStatus: String,
         updatedAt: Long,
         difficulty: String? = null,
+        authorUid: String? = null,
     ): JsAny =
         JSON.parse(
             buildJsonObject {
                 put(Fields.PUBLISH_STATUS, publishStatus)
                 put(Fields.UPDATED_AT, updatedAt)
                 if (difficulty != null) put(Fields.DIFFICULTY, difficulty)
+                if (authorUid != null) put(Fields.AUTHOR_UID, authorUid)
             }.toString()
         )!!
 

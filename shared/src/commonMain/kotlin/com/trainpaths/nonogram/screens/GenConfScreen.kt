@@ -42,6 +42,7 @@ import com.trainpaths.nonogram.classes.MIN_NONOGRAM_SIDE
 import com.trainpaths.nonogram.classes.PublishStatus
 import com.trainpaths.nonogram.classes.normalizeNonogramName
 import com.trainpaths.nonogram.classes.sanitizeNameInput
+import com.trainpaths.nonogram.dialogs.DeleteConfirmDialog
 import com.trainpaths.nonogram.dialogs.PublicEditConfirmDialog
 import com.trainpaths.nonogram.icons.build
 import com.trainpaths.nonogram.navigation.TopAppBar
@@ -63,12 +64,15 @@ fun GenConfScreen(
     isPublishBanned: Boolean,
     onBack: () -> Unit,
     onDone: () -> Unit,
+    onDeleted: () -> Unit,
 ) {
     var name by remember { mutableStateOf(genViewModel.nonogram.name.orEmpty()) }
     var rows by remember { mutableStateOf(genViewModel.height.toString()) }
     var cols by remember { mutableStateOf(genViewModel.width.toString()) }
     var pendingPublicSave by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingDelete by remember { mutableStateOf(false) }
     val authState by genViewModel.authState.collectAsState()
+    val isBusy = genViewModel.isSaving || genViewModel.isDeleting
 
     val textFieldColors = outlinedFieldColors()
 
@@ -78,7 +82,7 @@ fun GenConfScreen(
     ) {
         TopAppBar(
             titleIcon = build,
-            onBack = { if (!genViewModel.isSaving) onBack() },
+            onBack = { if (!isBusy) onBack() },
             backArrow = true,
             showSettings = true,
         )
@@ -164,12 +168,32 @@ fun GenConfScreen(
                         save()
                     }
                 },
-                enabled = !genViewModel.isSaving,
+                enabled = !isBusy,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = if (editing) 12.dp else 32.dp)
                     .tutorialAnchor(TutorialStep.GENCONF_DONE),
             )
+            AppButton(
+                text = if (genViewModel.isDeleting) "Deleting…" else "Delete",
+                onClick = { pendingDelete = true },
+                enabled = !isBusy && genViewModel.nonogram.id != 0L,
+                containerColor = MaterialTheme.colorScheme.onSecondary,
+                contentColor = MaterialTheme.colorScheme.secondary,
+                height = 40.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp)
+            )
+
+            genViewModel.deleteError?.let { error ->
+                Text(
+                    text = error,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 
@@ -182,7 +206,19 @@ fun GenConfScreen(
             onCancel = { pendingPublicSave = null },
         )
     }
+
+    if (pendingDelete) {
+        DeleteConfirmDialog(
+            isPublic = genViewModel.nonogram.isPublic,
+            onConfirm = {
+                pendingDelete = false
+                genViewModel.deleteNonogram(onDone = onDeleted)
+            },
+            onCancel = { pendingDelete = false },
+        )
+    }
 }
+
 
 /**
  * The publishing controls, shown only when editing a saved puzzle

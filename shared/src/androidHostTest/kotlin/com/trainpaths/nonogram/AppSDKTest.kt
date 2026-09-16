@@ -81,6 +81,23 @@ class AppSDKTest {
     }
 
     @Test
+    fun deleteNonogram_removesThePuzzleAndEveryUsersProgressOnIt() = runTest {
+        val doomed = sdk.addNonogram("EASY", listOf(listOf(1)), authorUid = "uid-7")
+        val kept = sdk.addNonogram("EASY", listOf(listOf(0)), authorUid = "uid-7")
+        sdk.saveProgressWithTimestamp("uid-7", doomed, "[[1]]", 100)
+        sdk.saveProgressWithTimestamp("uid-8", doomed, "[[0]]", 100)
+        sdk.saveProgressWithTimestamp("uid-7", kept, "[[0]]", 100)
+
+        sdk.deleteNonogram(doomed)
+
+        assertNull(sdk.getNonogramById(doomed))
+        assertNull(sdk.getSingleProgress("uid-7", doomed))
+        assertNull(sdk.getSingleProgress("uid-8", doomed))
+        assertNotNull(sdk.getNonogramById(kept))
+        assertNotNull(sdk.getSingleProgress("uid-7", kept))
+    }
+
+    @Test
     fun upsertNonogramFromRemote_roundTripsPublishStatus() = runTest {
         val remote = Nonogram(
             id = 43, difficulty = Difficulty.EASY, solution = listOf(listOf(1)),

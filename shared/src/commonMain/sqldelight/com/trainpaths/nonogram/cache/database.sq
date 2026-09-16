@@ -72,6 +72,12 @@ LIMIT 1;
 reassignAuthor:
 UPDATE NonogramData SET authorUid = :toUid WHERE authorUid = :fromUid;
 
+deleteNonogram:
+DELETE FROM NonogramData WHERE id = :id;
+
+deleteProgressForNonogram:
+DELETE FROM UserProgress WHERE nonogramId = :id;
+
 selectNonogramById:
 SELECT NonogramData.* FROM NonogramData WHERE id = ?;
 

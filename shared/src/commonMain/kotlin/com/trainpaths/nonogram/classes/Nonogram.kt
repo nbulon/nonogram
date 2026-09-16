@@ -14,6 +14,9 @@ enum class Difficulty(val label: String) {
  *
  * The ordinal is what the `status` column stores, so entries may be appended but never reordered
  * or removed without a migration — which is why [VALID] sits last rather than beside [NONE].
+ *
+ * [DELETED] is a Firestore-only tombstone: written when the author deletes a puzzle, so a stale
+ * copy on another device cannot push it back to life, and removed locally on pull — never stored.
  */
 enum class PublishStatus {
     NONE,
@@ -22,6 +25,7 @@ enum class PublishStatus {
     UNLISTED,
     APPROVED,
     VALID,
+    DELETED,
 }
 
 const val MAX_NONOGRAM_NAME_LENGTH = 30

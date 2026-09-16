@@ -165,6 +165,20 @@ class FirebaseWebSyncService(private val sdk: AppSDK) : SyncService {
             true
         }
 
+    override suspend fun deleteNonogram(firebaseUid: String, nonogramId: Long): Boolean =
+        gated(firebaseUid, "delete of nonogram $nonogramId rejected", false) {
+            setDocMerged(
+                doc(FirebaseWeb.requireFirestore(), Paths.nonogram(nonogramId)),
+                FirebaseWeb.makePublishStatusData(
+                    publishStatus = PublishStatus.DELETED.name,
+                    updatedAt = Clock.System.now().toEpochMilliseconds(),
+                    authorUid = firebaseUid,
+                ),
+                FirebaseWeb.mergeOptions(),
+            ).await()
+            true
+        }
+
     override suspend fun fetchModerationGate(firebaseUid: String): ModerationGate? =
         gated(firebaseUid, "moderation gate read failed", null) { readModerationGate(firebaseUid) }
 

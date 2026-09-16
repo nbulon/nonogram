@@ -66,6 +66,14 @@ class NonogramDocumentTest {
     }
 
     @Test
+    fun carriesTheDeletedTombstone() {
+        val nonogram = assertNotNull(document(publishStatus = "DELETED").parse())
+
+        assertEquals(PublishStatus.DELETED, nonogram.publishStatus)
+        assertTrue(skipped.isEmpty())
+    }
+
+    @Test
     fun unknownEnumNamesFallBackInsteadOfSkipping() {
         val nonogram = assertNotNull(
             document(difficulty = "IMPOSSIBLE", publishStatus = "RETRACTED").parse()

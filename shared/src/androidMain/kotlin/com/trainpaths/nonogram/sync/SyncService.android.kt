@@ -119,6 +119,19 @@ class FirebaseAndroidSyncService(private val sdk: AppSDK) : SyncService {
             true
         }
 
+    override suspend fun deleteNonogram(firebaseUid: String, nonogramId: Long): Boolean =
+        logged("delete of nonogram $nonogramId rejected", false) {
+            nonogramsCollection().document(nonogramId.toString()).set(
+                mapOf(
+                    Fields.PUBLISH_STATUS to PublishStatus.DELETED.name,
+                    Fields.UPDATED_AT to Clock.System.now().toEpochMilliseconds(),
+                    Fields.AUTHOR_UID to firebaseUid,
+                ),
+                merge = true,
+            )
+            true
+        }
+
     override suspend fun fetchModerationGate(firebaseUid: String): ModerationGate? =
         logged("moderation gate read failed", null) { readModerationGate(firebaseUid) }
 
