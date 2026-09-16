@@ -38,7 +38,7 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=580
         run: |
-          nice -n 15 ./gradlew :webApp:wasmJsBrowserDistribution :webApp:jsBrowserDistribution \
+          nice -n 15 ./gradlew :webApp:wasmJsBrowserDistribution \
             -Pnonogram.env=prod \
             --no-daemon --no-parallel --max-workers=1 \
             -Dorg.gradle.jvmargs="-Xmx1380m -XX:MaxMetaspaceSize=370m -XX:+UseSerialGC -XX:MaxHeapFreeRatio=20 -XX:MinHeapFreeRatio=10 -Dfile.encoding=UTF-8" \
