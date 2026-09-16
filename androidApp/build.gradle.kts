@@ -27,8 +27,8 @@ android {
         applicationId = "com.trainpaths.nonogram"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 9
-        versionName = "1.0.7"
+        versionCode = 11
+        versionName = "1.1.0"
     }
 
     flavorDimensions += "env"
