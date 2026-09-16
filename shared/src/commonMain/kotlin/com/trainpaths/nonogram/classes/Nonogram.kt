@@ -30,6 +30,8 @@ enum class PublishStatus {
 
 const val MAX_NONOGRAM_NAME_LENGTH = 30
 const val UNNAMED_NONOGRAM_TITLE = "???"
+const val NAME_HAS_SYMBOLS_MESSAGE = "Emoji and symbols aren't allowed."
+const val NAME_NOT_ALLOWED_MESSAGE = "This name isn't allowed."
 
 const val MIN_NONOGRAM_SIDE = 5
 const val MAX_NONOGRAM_SIDE = 60
@@ -109,3 +111,24 @@ fun sanitizeNameInput(value: String): String =
 /** The stored form: [sanitizeNameInput] plus a trim, with a name left blank stored as null. */
 fun normalizeNonogramName(value: String): String? =
     sanitizeNameInput(value.trim()).takeIf { it.isNotEmpty() }
+
+/** Why [name] may not be used, as the message to show, or null when it is fine. A null name is fine. */
+fun nameControl(name: String?): String? = when {
+    name == null -> null
+    name.any { it.isSymbolOrEmoji() } -> NAME_HAS_SYMBOLS_MESSAGE
+    containsBlockedTerm(name) -> NAME_NOT_ALLOWED_MESSAGE
+    else -> null
+}
+
+private fun Char.isSymbolOrEmoji(): Boolean =
+    isHighSurrogate() || isLowSurrogate() ||
+            code in 0x2600..0x27BF || code in 0x2B00..0x2BFF ||
+            code == 0xFE0F || code == 0x200D ||
+            category in INVISIBLE_CATEGORIES
+
+private val INVISIBLE_CATEGORIES = setOf(
+    CharCategory.CONTROL,
+    CharCategory.FORMAT,
+    CharCategory.PRIVATE_USE,
+    CharCategory.UNASSIGNED,
+)

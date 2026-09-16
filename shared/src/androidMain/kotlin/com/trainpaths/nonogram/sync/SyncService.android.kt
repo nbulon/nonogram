@@ -170,7 +170,10 @@ class FirebaseAndroidSyncService(private val sdk: AppSDK) : SyncService {
                 (if (approve) PublishStatus.APPROVED else PublishStatus.DENIED).name,
             )
             put(Fields.UPDATED_AT, Clock.System.now().toEpochMilliseconds())
-            if (approve) put(Fields.DIFFICULTY, difficulty.name)
+            if (approve) {
+                put(Fields.DIFFICULTY, difficulty.name)
+                put(Fields.NAME, nonogram.name)
+            }
         }
         nonogramsCollection().document(nonogram.id.toString()).set(fields, merge = true)
         val streak = nextDenialStreak(

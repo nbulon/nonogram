@@ -3,9 +3,11 @@ package com.trainpaths.nonogram.cache
 import com.trainpaths.nonogram.classes.Difficulty
 import com.trainpaths.nonogram.classes.MAX_NONOGRAM_NAME_LENGTH
 import com.trainpaths.nonogram.classes.isWellFormedGrid
+import com.trainpaths.nonogram.classes.nameControl
 import com.trainpaths.nonogram.classes.normalizeNonogramName
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -48,6 +50,7 @@ class SeedPuzzlesTest {
             val name = seed.name ?: return@forEach
             assertTrue(name.length <= MAX_NONOGRAM_NAME_LENGTH, "seed ${seed.id} has an over-long name")
             assertEquals(name, normalizeNonogramName(name), "seed ${seed.id}'s name is not normalized")
+            assertNull(nameControl(name), "seed ${seed.id}'s name would be refused")
         }
     }
 }
