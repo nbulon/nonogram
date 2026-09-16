@@ -128,6 +128,16 @@ class Solver(val ng: Nonogram) {
         val solvedClues = if (isRow) solvedRowClues[rowIndex] else solvedColClues[rowIndex]
         val emptyCells = rowSize - (clues.sum() + clues.size - 1)
 
+        if (solvedClues.count() == clues.count()) {
+            for (i in 0 until rowSize) {
+                if (cellAt(i).state == 0) {
+                    if (isRow) drawCross(rowIndex, i)
+                    else drawCross(i, rowIndex)
+                }
+            }
+            return
+        }
+
         fun getLeftOffset(cellIndex: Int, clueIndex: Int): Int {
             var leftOffset = 0
             for (i in cellIndex - 1 downTo 0) {
@@ -392,7 +402,6 @@ class Solver(val ng: Nonogram) {
                 index = r
             }
         }
-
     }
 
     private fun drawTile(row: Int, col: Int, index: Int?, isRow: Boolean = true) {
