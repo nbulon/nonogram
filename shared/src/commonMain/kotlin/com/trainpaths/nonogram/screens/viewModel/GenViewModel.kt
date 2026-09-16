@@ -1,5 +1,6 @@
 package com.trainpaths.nonogram.screens.viewModel
 
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,6 +19,9 @@ import com.trainpaths.nonogram.classes.TileState
 import com.trainpaths.nonogram.classes.isWellFormedGrid
 import com.trainpaths.nonogram.classes.nameControl
 import com.trainpaths.nonogram.classes.toSolutionInts
+import com.trainpaths.nonogram.filter.FilterEntry
+import com.trainpaths.nonogram.filter.FilterSortState
+import com.trainpaths.nonogram.filter.NonogramFilters
 import com.trainpaths.nonogram.sync.SyncService
 import com.trainpaths.nonogram.sync.syncPublicNonograms
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +101,16 @@ class GenViewModel(
     var isLoadingMine by mutableStateOf(true)
         private set
 
+    var filterSort: FilterSortState by mutableStateOf(FilterSortState())
+        private set
+    val filterEntries: List<FilterEntry> = NonogramFilters.GENERATOR
+
+    /** [myNonograms] as the list shows them: filtered, and latest-updated first unless a sort is chosen. */
+    val visibleNonograms: List<Nonogram> by derivedStateOf {
+        val filtered = filterSort.applyTo(myNonograms, filterEntries)
+        if (filterSort.sortsBy(filterEntries)) filtered else filtered.sortedByDescending { it.updatedAt }
+    }
+
     /** True when the current puzzle has edits not yet written to the database. */
     var isDirty by mutableStateOf(false)
         private set
@@ -170,6 +184,10 @@ class GenViewModel(
                 isLoadingMine = false
             }
         }
+    }
+
+    fun applyFilterSort(state: FilterSortState) {
+        filterSort = state
     }
 
     fun startNew() {

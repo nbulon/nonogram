@@ -21,6 +21,9 @@ object GeneratorRoute
 object GenScanRoute
 
 @Serializable
+data class FilterRoute(val generator: Boolean)
+
+@Serializable
 object SettingsRoute
 
 @Serializable

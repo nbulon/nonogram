@@ -71,6 +71,7 @@ data class Nonogram(
 
     val height: Int get() = solution.size
     val width: Int get() = solution.firstOrNull()?.size ?: 0
+    val longSide: Int get() = maxOf(width, height)
 
     val rowClues: List<List<Int>> by lazy {
         solution.map { row -> computeLineClues(row) }

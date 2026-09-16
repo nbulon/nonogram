@@ -38,7 +38,14 @@ import com.trainpaths.nonogram.color
 private val MIN_CARD_WIDTH = 220.dp
 
 /** What a card's top-right dot reports instead of the puzzle's difficulty. */
-enum class CardStatus { INVALID, UNPUBLISHED, PUBLISHED }
+enum class CardStatus(val label: String) { INVALID("Invalid"), UNPUBLISHED("Valid"), PUBLISHED("Public") }
+
+val Nonogram.cardStatus: CardStatus
+    get() = when {
+        isPublic -> CardStatus.PUBLISHED
+        !isKnownValid -> CardStatus.INVALID
+        else -> CardStatus.UNPUBLISHED
+    }
 
 @Composable
 fun NonogramGrid(

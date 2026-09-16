@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.trainpaths.nonogram.icons.arrow_drop_down
 import com.trainpaths.nonogram.icons.filter
+import com.trainpaths.nonogram.icons.more_horiz
 
 private val ICON_SIZE = 24.dp
 private val CORNER = 8.dp
@@ -57,13 +58,15 @@ private fun menuItemColors() = MenuDefaults.itemColors(
 
 /**
  * Top-bar button opening the filter/sort dropdown. Edits are collected in a draft and handed to
- * [onApply] only when the menu is dismissed, so the grid re-filters in one step on exit.
+ * [onApply] only when the menu is dismissed, so the grid re-filters in one step on exit. The
+ * closing "More" row applies the draft the same way before [onMore] opens the Filter screen.
  */
 @Composable
 fun FilterMenuButton(
     entries: List<FilterEntry>,
     state: FilterSortState,
     onApply: (FilterSortState) -> Unit,
+    onMore: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf(state) }
@@ -140,8 +143,46 @@ fun FilterMenuButton(
                     )
                 }
             }
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 8.dp),
+                thickness = 2.dp,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+            MoreItem(
+                active = draft.hasSearch,
+                onClick = {
+                    expanded = false
+                    onApply(draft)
+                    onMore()
+                },
+            )
         }
     }
+}
+
+/** Opens the Filter screen; its icon lights up while a search or size range is narrowing the list. */
+@Composable
+private fun MoreItem(active: Boolean, onClick: () -> Unit) {
+    DropdownMenuItem(
+        modifier = Modifier.height(ENTRY_HEIGHT),
+        text = {
+            Text(
+                "More",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        },
+        onClick = onClick,
+        trailingIcon = {
+            Icon(
+                imageVector = more_horiz,
+                contentDescription = if (active) "Search and size filter active" else "Search and size filter",
+                modifier = Modifier
+                    .size(ICON_SIZE),
+            )
+        },
+        colors = menuItemColors(),
+    )
 }
 
 @Composable

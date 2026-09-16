@@ -119,11 +119,18 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
   `Modifier.widthIn(max = …)` ahead of any `fillMax*` and centred by the screen root's `horizontalAlignment`. App bars
   stay full-bleed with capped content, the Board is deliberately exempt, and `NonogramGrid` picks its column count from
   the available width.
-- **`filter/`** — the menu's combined filter/sorter: a pure `FilterSortState` model plus the
+- **`filter/`** — the combined filter/sorter behind both list screens: a pure `FilterSortState` model plus the
   `FilterMenuButton` dropdown hosted in the `TopAppBar`'s `navigationContent` slot. Rows are data — a sortable
   `FilterAttribute` with checkable values, or a standalone `FilterToggle` (the "Personal"
-  own-puzzles switch) — so adding one is a list entry in `NonogramFilters.forUser(authorUid)`, a function rather than a
-  constant because ownership is user-scoped. A row's `label` is also its id.
+  own-puzzles switch) — so adding one is a list entry in `NonogramFilters.forUser(authorUid)` (the menu; a function
+  rather than a constant because ownership is user-scoped) or `NonogramFilters.GENERATOR` (the generator list:
+  one `STATUS` attribute over `CardStatus`, whose `Nonogram.cardStatus` mapping lives beside the enum). A row's
+  `label` is also its id. `FilterSortState` also carries the two filters the dropdown's closing "More" row opens
+  `FilterScreen` for (`FilterRoute(generator)`, a flag so `App.kt` binds the right ViewModel):
+  `query`, a case-insensitive name search that drops unnamed puzzles while non-blank, and `sizeRange`, a bound on
+  `Nonogram.longerSide` edited through text fields and a `RangeSlider` (`withMinSize`/`withMaxSize` keep the ends
+  ordered and inside `FULL_SIZE_RANGE`). The screen applies every edit live, so back just pops. With no sort chosen
+  the menu lists own puzzles first and the generator lists latest-updated first.
 - **`tutorial/`** — the first-run hint overlay: `TutorialStep` (an enum whose declaration order is priority order,
   carrying the copy), `TutorialRepository` (one `tutorial_seen_<STEP>` boolean per step, device-wide so it survives
   sign-out), `TutorialController` + `Modifier.tutorialAnchor(step)`
