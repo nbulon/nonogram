@@ -4,6 +4,7 @@ import com.trainpaths.nonogram.AppSDK
 import com.trainpaths.nonogram.auth.AuthRepository
 import com.trainpaths.nonogram.classes.Difficulty
 import com.trainpaths.nonogram.classes.Nonogram
+import com.trainpaths.nonogram.classes.PublishStatus
 import kotlin.time.Clock
 
 interface SyncService {
@@ -29,6 +30,12 @@ interface SyncService {
     /** Moves the puzzle to `PENDING`. Returns false when the rules reject it (e.g. banned author). */
     suspend fun requestPublish(firebaseUid: String, nonogram: Nonogram): Boolean
 
+    /**
+     * Marks the puzzle `DELETED` — a tombstone, never a hard delete, so the author's other devices
+     * drop it on their next owned pull instead of pushing a stale copy back. False when refused.
+     */
+    suspend fun deleteNonogram(firebaseUid: String, nonogramId: Long): Boolean
+
     /** Reads the author's denial streak / ban flag; null when the read failed. */
     suspend fun fetchModerationGate(firebaseUid: String): ModerationGate?
 
@@ -51,10 +58,11 @@ interface SyncService {
 }
 
 /**
- * Merge policy for pulled nonograms, shared by both platform implementations: remote newer →
- * upsert locally, local newer and locally authored → push back. Returns the newest received
- * `updatedAt` timestamp for the next incremental fetch. A null [firebaseUid] is a guest's
- * unauthenticated public pull: merge in, never push back.
+ * Merge policy for pulled nonograms, shared by both platform implementations: a `DELETED`
+ * tombstone removes the local row outright, otherwise remote newer → upsert locally, local newer
+ * and locally authored → push back. Returns the newest received `updatedAt` timestamp for the
+ * next incremental fetch. A null [firebaseUid] is a guest's unauthenticated public pull: merge in,
+ * never push back.
  */
 internal suspend fun SyncService.mergeRemoteNonograms(
     sdk: AppSDK,
@@ -68,6 +76,11 @@ internal suspend fun SyncService.mergeRemoteNonograms(
         if (remote.updatedAt in (newestReceivedAt + 1)..now) newestReceivedAt = remote.updatedAt
         val local = sdk.getNonogramById(remote.id)
         if (local != null && local.authorUid.isNotEmpty() && local.authorUid != remote.authorUid) {
+            continue
+        }
+        // Delete wins regardless of timestamps, or an offline edit elsewhere would revive the puzzle.
+        if (remote.publishStatus == PublishStatus.DELETED) {
+            if (local != null) sdk.deleteNonogram(remote.id)
             continue
         }
         if (local == null || local.updatedAt < remote.updatedAt) {

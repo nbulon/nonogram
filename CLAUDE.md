@@ -90,7 +90,8 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
   reads synchronously in the constructor (no `initialize()` needed), exposes a `StateFlow` per preference, writes
   through on set. See **AppTheme** below.
 - **`sync/SyncService`** — interface for syncing *both* progress and the shared `nonograms` collection (push/pull/merge;
-  `mergeRemoteNonograms` is the shared merge policy), plus the publish-review calls (`requestPublish`,
+  `mergeRemoteNonograms` is the shared merge policy), the author's `deleteNonogram` (the `DELETED` tombstone — see
+  **Data Model**), plus the publish-review calls (`requestPublish`,
   `fetchModerationGate`, `isAdmin`, `pullPendingReviews`, `decideReview`. The review queue is a plain `List<Nonogram>`:
   the author rides along in `authorUid`, so there is no wrapper type; pure streak/ban helpers live in
   `sync/Moderation.kt`). `sync/FirebaseAndroidSyncService` (androidMain)
@@ -235,14 +236,19 @@ silently disappears. Icons come from the hand-built `icons/` package of `ImageVe
 - **`Nonogram`** — `id`, `difficulty` (enum: EASY/MEDIUM/HARD/HARDCORE), `solution` (List<List<Int>> stored as JSON),
   `name: String?`, `authorUid` (the user key — see `auth/AuthRepository`; the same string as the Firestore
   `authorUid` field, so no local↔remote translation is needed), `updatedAt`, `publishStatus` (enum:
-  NONE/PENDING/DENIED/UNLISTED/APPROVED/VALID, stored as its ordinal in the DB column `status`, as its name in the
-  Firestore field `publishStatus`). **`publishStatus` also carries the Solver verdict**, because the two axes are not
+  NONE/PENDING/DENIED/UNLISTED/APPROVED/VALID/DELETED, stored as its ordinal in the DB column `status`, as its name in
+  the Firestore field `publishStatus`). **`publishStatus` also carries the Solver verdict**, because the two axes are not
   independent: publication may only be requested from `VALID`, so every state past `NONE` was reached by passing the
   Solver and `NONE` is the only state a puzzle that is not uniquely solvable can be in. That is what lets
   `GenListScreen` read its status dot off the column (`isKnownValid get() = publishStatus != NONE`) instead of
   re-solving every puzzle it shows; `GenViewModel.afterSave` is the one place the stored status is derived from a fresh
-  verdict. `VALID` is declared **last** so the ordinals of the existing entries do not move — an older build reads it,
-  and any unknown ordinal or name, back as `NONE` (`util/PublishStatusConversions.kt`). Visibility is derived, not
+  verdict. `VALID` and `DELETED` are declared **last** so the ordinals of the existing entries do not move — an older
+  build reads them, and any unknown ordinal or name, back as `NONE` (`util/PublishStatusConversions.kt`). `DELETED` is a
+  **Firestore-only tombstone**: `SyncService.deleteNonogram` writes it when the author deletes a puzzle (never a hard
+  delete, so a stale copy on another of the author's devices cannot push it back to life), and `mergeRemoteNonograms`
+  removes the local row when it pulls one — delete wins regardless of timestamps — so the DB never stores it and no
+  query has to filter it out. Other players who already pulled a public copy keep it, the same way `UNLISTED` does not
+  propagate: the public pull only ever fetches `APPROVED` docs. Visibility is derived, not
   stored: `isPublic get() = publishStatus == APPROVED`, and the author's on/off switch moves an approved puzzle between
   APPROVED and UNLISTED. Computes `rowClues`/`colClues` on the fly, and `isValid` lazily via the `Solver`. Name helpers live
   alongside: `MAX_NONOGRAM_NAME_LENGTH` (30), `normalizeNonogramName()`, `UNNAMED_NONOGRAM_TITLE`. Ownership is
@@ -400,7 +406,10 @@ approved on another device is in the local DB before the comparison; a failed pu
 The match is exact — mirrored, rotated or padded grids are different puzzles. **Difficulty is the reviewer's call**:
 `GenViewModel` authors every puzzle as `EASY` (no selector), and `AdminScreen`'s four difficulty buttons — defaulting to
 `MEDIUM` — decide what `SyncService.decideReview` writes alongside `APPROVED`, which every other device picks up on its
-next public pull.
+next public pull. An author deletes a puzzle from the same config screen (`DeleteConfirmDialog` → `GenViewModel.deleteNonogram`):
+a signed-in author tombstones the Firestore doc first and keeps the local row if that is refused, a guest just drops
+the local row (`AppSDK.deleteNonogram`, progress rows included). The Firestore rules must let the author write
+`publishStatus = DELETED` — on update from any prior state, and on create (a puzzle whose push never landed).
 
 Web (js + wasmJs) has persistent OPFS storage plus Google sign-in and Firestore sync via hand-written Firebase JS SDK
 externals in `shared/src/webMain` (no gitlive — it doesn't publish wasmJs; see `docs/web-architecture.md` for the

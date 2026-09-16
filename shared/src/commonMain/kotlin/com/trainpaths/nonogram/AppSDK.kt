@@ -84,6 +84,10 @@ class AppSDK(private val databaseFactory: DatabaseFactory) {
     ): Long =
         onDb { updateNonogram(id, nonogram) }
 
+    /** Removes the puzzle together with every progress row on it. */
+    suspend fun deleteNonogram(id: Long) =
+        onDb { deleteNonogram(id) }
+
     suspend fun upsertNonogramFromRemote(nonogram: Nonogram) =
         onDb { upsertNonogram(nonogram) }
 

@@ -206,6 +206,11 @@ private fun AppContent(
                                 }
                             }
                         },
+                        onDeleted = {
+                            navController.navigate(GenListRoute) {
+                                popUpTo(GenListRoute) { inclusive = true }
+                            }
+                        },
                     )
                 }
                 composable<GenScanRoute> {

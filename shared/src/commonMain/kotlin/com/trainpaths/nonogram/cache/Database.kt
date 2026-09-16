@@ -68,7 +68,7 @@ internal class Database(driver: SqlDriver) {
 
     internal suspend fun countNonograms(): Long =
         dbQuery.countNonograms().awaitAsOne()
-    
+
     internal suspend fun insertSeeds(seeds: List<SeedPuzzle>) {
         val now = Clock.System.now().toEpochMilliseconds()
         dbQuery.transaction {
@@ -126,6 +126,13 @@ internal class Database(driver: SqlDriver) {
 
     internal suspend fun reassignAuthor(fromUid: String, toUid: String) {
         dbQuery.reassignAuthor(toUid = toUid, fromUid = fromUid)
+    }
+
+    internal suspend fun deleteNonogram(id: Long) {
+        dbQuery.transaction {
+            dbQuery.deleteProgressForNonogram(id)
+            dbQuery.deleteNonogram(id)
+        }
     }
 
     internal suspend fun upsertNonogram(nonogram: Nonogram) {

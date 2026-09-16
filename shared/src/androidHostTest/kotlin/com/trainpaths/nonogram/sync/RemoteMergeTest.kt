@@ -4,18 +4,20 @@ import com.trainpaths.nonogram.AppSDK
 import com.trainpaths.nonogram.TestDatabaseFactory
 import com.trainpaths.nonogram.classes.Difficulty
 import com.trainpaths.nonogram.classes.Nonogram
+import com.trainpaths.nonogram.classes.PublishStatus
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The progress merge as both platform services run it — they supply only the fetch and the single
- * document write, so a [SyncService] that records its pushes is the whole platform half.
+ * The progress and nonogram merges as both platform services run them — they supply only the fetch
+ * and the single document write, so a [SyncService] that records its pushes is the whole platform half.
  */
-class RemoteProgressTest {
+class RemoteMergeTest {
 
     private lateinit var sdk: AppSDK
     private lateinit var service: RecordingSyncService
@@ -30,6 +32,16 @@ class RemoteProgressTest {
 
     private suspend fun aNonogram(): Long =
         sdk.addNonogram("EASY", listOf(listOf(1, 0), listOf(0, 1)))
+
+    private fun remote(
+        id: Long,
+        updatedAt: Long,
+        authorUid: String = uid,
+        publishStatus: PublishStatus = PublishStatus.VALID,
+    ) = Nonogram(
+        id = id, difficulty = Difficulty.EASY, solution = listOf(listOf(1, 0), listOf(0, 1)),
+        name = "Comet", authorUid = authorUid, updatedAt = updatedAt, publishStatus = publishStatus,
+    )
 
     @Test
     fun mergeRemoteProgress_insertsRowsTheDeviceHasNeverSeen() = runTest {
@@ -104,6 +116,75 @@ class RemoteProgressTest {
             service.pushed.toSet(),
         )
     }
+
+    @Test
+    fun mergeRemoteNonograms_remoteNewerOverwritesLocal() = runTest {
+        sdk.upsertNonogramFromRemote(remote(42, updatedAt = 100).copy(name = "Old"))
+
+        service.mergeRemoteNonograms(sdk, uid, 0, listOf(remote(42, updatedAt = 200)))
+
+        assertEquals("Comet", sdk.getNonogramById(42)?.name)
+        assertTrue(service.pushedNonograms.isEmpty())
+    }
+
+    @Test
+    fun mergeRemoteNonograms_localNewerIsPushedBack() = runTest {
+        val local = remote(42, updatedAt = 300).copy(name = "Mine")
+        sdk.upsertNonogramFromRemote(local)
+
+        service.mergeRemoteNonograms(sdk, uid, 0, listOf(remote(42, updatedAt = 200)))
+
+        assertEquals("Mine", sdk.getNonogramById(42)?.name)
+        assertEquals(listOf(local), service.pushedNonograms)
+    }
+
+    @Test
+    fun mergeRemoteNonograms_deletedTombstoneRemovesLocalRow() = runTest {
+        sdk.upsertNonogramFromRemote(remote(42, updatedAt = 100))
+        sdk.saveProgressWithTimestamp(uid, 42, "[[1,0],[0,0]]", 100)
+
+        val cursor = service.mergeRemoteNonograms(
+            sdk, uid, 0, listOf(remote(42, updatedAt = 200, publishStatus = PublishStatus.DELETED)),
+        )
+
+        assertNull(sdk.getNonogramById(42))
+        assertNull(sdk.getSingleProgress(uid, 42))
+        assertEquals(200, cursor)
+        assertTrue(service.pushedNonograms.isEmpty())
+    }
+
+    @Test
+    fun mergeRemoteNonograms_deletedTombstoneWinsOverNewerLocal() = runTest {
+        sdk.upsertNonogramFromRemote(remote(42, updatedAt = 300))
+
+        service.mergeRemoteNonograms(
+            sdk, uid, 0, listOf(remote(42, updatedAt = 200, publishStatus = PublishStatus.DELETED)),
+        )
+
+        assertNull(sdk.getNonogramById(42))
+        assertTrue(service.pushedNonograms.isEmpty())
+    }
+
+    @Test
+    fun mergeRemoteNonograms_deletedTombstoneIsNeverStoredLocally() = runTest {
+        service.mergeRemoteNonograms(
+            sdk, uid, 0, listOf(remote(42, updatedAt = 200, publishStatus = PublishStatus.DELETED)),
+        )
+
+        assertNull(sdk.getNonogramById(42))
+    }
+
+    @Test
+    fun mergeRemoteNonograms_foreignTombstoneLeavesAnotherAuthorsRowAlone() = runTest {
+        sdk.upsertNonogramFromRemote(remote(42, updatedAt = 100))
+
+        service.mergeRemoteNonograms(
+            sdk, uid, 0,
+            listOf(remote(42, updatedAt = 200, authorUid = "uid-8", publishStatus = PublishStatus.DELETED)),
+        )
+
+        assertNotNull(sdk.getNonogramById(42))
+    }
 }
 
 private data class Push(
@@ -113,24 +194,29 @@ private data class Push(
     val updatedAt: Long,
 )
 
-/** Records the one write the shared merge is allowed to make; everything else is unreachable. */
+/** Records the one write each shared merge is allowed to make; everything else is unreachable. */
 private class RecordingSyncService : SyncService {
 
     val pushed = mutableListOf<Push>()
+    val pushedNonograms = mutableListOf<Nonogram>()
 
     override suspend fun pushProgress(firebaseUid: String, nonogramId: Long, boardState: String?, updatedAt: Long) {
         pushed += Push(firebaseUid, nonogramId, boardState, updatedAt)
+    }
+
+    override suspend fun pushNonogram(firebaseUid: String, nonogram: Nonogram, writePublishStatus: Boolean) {
+        pushedNonograms += nonogram
     }
 
     override suspend fun hasRemoteProgress(firebaseUid: String) = unused()
     override suspend fun uploadAllLocalProgress(firebaseUid: String) = unused()
     override suspend fun pullAllProgress(firebaseUid: String) = unused()
     override suspend fun pullAndMergeAllProgress(firebaseUid: String) = unused()
-    override suspend fun pushNonogram(firebaseUid: String, nonogram: Nonogram, writePublishStatus: Boolean) = unused()
     override suspend fun uploadAllLocalNonograms(firebaseUid: String) = unused()
     override suspend fun pullPublicNonogramsSince(firebaseUid: String?, since: Long) = unused()
     override suspend fun pullOwnedNonograms(firebaseUid: String, since: Long) = unused()
     override suspend fun requestPublish(firebaseUid: String, nonogram: Nonogram) = unused()
+    override suspend fun deleteNonogram(firebaseUid: String, nonogramId: Long) = unused()
     override suspend fun fetchModerationGate(firebaseUid: String) = unused()
     override suspend fun isAdmin(firebaseUid: String) = unused()
     override suspend fun pullPendingReviews(firebaseUid: String, limit: Int) = unused()
@@ -141,5 +227,5 @@ private class RecordingSyncService : SyncService {
         difficulty: Difficulty,
     ) = unused()
 
-    private fun unused(): Nothing = error("not part of the progress merge")
+    private fun unused(): Nothing = error("not part of either merge")
 }

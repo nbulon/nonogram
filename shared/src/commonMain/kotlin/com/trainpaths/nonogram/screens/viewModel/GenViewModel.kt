@@ -123,6 +123,14 @@ class GenViewModel(
     var publishError by mutableStateOf<String?>(null)
         private set
 
+    /** True while the current puzzle is being deleted. */
+    var isDeleting by mutableStateOf(false)
+        private set
+
+    /** A user-facing message when the latest delete could not be completed. */
+    var deleteError by mutableStateOf<String?>(null)
+        private set
+
     /** Whether the editor has a new or changed puzzle that can currently be persisted. */
     val canSave: Boolean
         get() = !isSaving && (isDirty || nonogram.id == 0L)
@@ -229,6 +237,7 @@ class GenViewModel(
         saveError = null
         validationError = null
         publishError = null
+        deleteError = null
     }
 
     fun updateNonogram() {
@@ -356,6 +365,35 @@ class GenViewModel(
                 publishError = error.message ?: "Could not send this publish request."
             } finally {
                 isRequestingPublish = false
+            }
+        }
+    }
+
+    /**
+     * Deletes the saved puzzle. A signed-in author tombstones it in Firestore first and keeps the
+     * local row if that is refused, so the two never disagree; a guest has nothing remote to clear.
+     */
+    fun deleteNonogram(onDone: () -> Unit = {}) {
+        if (isSaving || isDeleting) return
+        val nonogramId = nonogram.id
+        if (nonogramId == 0L) return
+        isDeleting = true
+        deleteError = null
+        launchGuarded {
+            try {
+                val firebaseUid = authRepository.currentFirebaseUid
+                if (firebaseUid != null && !syncService.deleteNonogram(firebaseUid, nonogramId)) {
+                    deleteError = "Could not delete this nonogram. Check your connection and try again."
+                    return@launchGuarded
+                }
+                sdk.deleteNonogram(nonogramId)
+                onDone()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                deleteError = error.message ?: "Could not delete this nonogram."
+            } finally {
+                isDeleting = false
             }
         }
     }
