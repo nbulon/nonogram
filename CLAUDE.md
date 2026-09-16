@@ -251,7 +251,11 @@ silently disappears. Icons come from the hand-built `icons/` package of `ImageVe
   propagate: the public pull only ever fetches `APPROVED` docs. Visibility is derived, not
   stored: `isPublic get() = publishStatus == APPROVED`, and the author's on/off switch moves an approved puzzle between
   APPROVED and UNLISTED. Computes `rowClues`/`colClues` on the fly, and `isValid` lazily via the `Solver`. Name helpers live
-  alongside: `MAX_NONOGRAM_NAME_LENGTH` (30), `normalizeNonogramName()`, `UNNAMED_NONOGRAM_TITLE`. Ownership is
+  alongside: `MAX_NONOGRAM_NAME_LENGTH` (30), `normalizeNonogramName()`, `UNNAMED_NONOGRAM_TITLE`, and
+  `nonogramNameProblem()` — the client-side name gate (emoji/symbols, plus the substring blocklist in
+  `classes/NameBlocklist.kt`), returning the message to show or null; a blank name is always fine. The shared
+  `NameField` (`screens/GenConfScreen.kt`) renders it as the field's error, and `GenViewModel.requestPublish` and
+  `AdminViewModel.accept` refuse a name it rejects. Ownership is
   `isOwned(uid)`, which never matches the blank `authorUid` seeded puzzles carry. Grid shape lives here too:
   `MIN_NONOGRAM_SIDE` (5) / `MAX_NONOGRAM_SIDE` (60), clamped in `GenViewModel.setNonogram`/`resizeNonogram` and shown
   in `GenConfScreen`'s size fields, plus `isRectangularGrid()` / `isWellFormedGrid()`. Both sync services reject a
@@ -406,7 +410,9 @@ approved on another device is in the local DB before the comparison; a failed pu
 The match is exact — mirrored, rotated or padded grids are different puzzles. **Difficulty is the reviewer's call**:
 `GenViewModel` authors every puzzle as `EASY` (no selector), and `AdminScreen`'s four difficulty buttons — defaulting to
 `MEDIUM` — decide what `SyncService.decideReview` writes alongside `APPROVED`, which every other device picks up on its
-next public pull. An author deletes a puzzle from the same config screen (`DeleteConfirmDialog` → `GenViewModel.deleteNonogram`):
+next public pull. **So is the name**: `AdminScreen` shows it in an editable `NameField`, and an approval writes
+`AdminViewModel.name` (normalized, name-gate checked) to the `name` field the same way — a denial leaves the
+author's name alone. An author deletes a puzzle from the same config screen (`DeleteConfirmDialog` → `GenViewModel.deleteNonogram`):
 a signed-in author tombstones the Firestore doc first and keeps the local row if that is refused, a guest just drops
 the local row (`AppSDK.deleteNonogram`, progress rows included). The Firestore rules must let the author write
 `publishStatus = DELETED` — on update from any prior state, and on create (a puzzle whose push never landed).

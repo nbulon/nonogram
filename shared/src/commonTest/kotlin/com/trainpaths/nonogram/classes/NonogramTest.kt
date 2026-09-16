@@ -316,6 +316,34 @@ class NonogramTest {
     }
 
     @Test
+    fun ordinaryAndMissingNamesHaveNoProblem() {
+        assertNull(nameControl(null))
+        assertNull(nameControl("Blue whale"))
+        assertNull(nameControl("Ünïcödé-name, 2nd try!"))
+    }
+
+    @Test
+    fun blockedTermsAreRefusedHoweverTheyAreDisguised() {
+        listOf("shit", "SHIT", "sh1t", "s h.i t", "bullshit", "\$hit").forEach { name ->
+            assertEquals(NAME_NOT_ALLOWED_MESSAGE, nameControl(name), "'$name' should be refused")
+        }
+    }
+
+    @Test
+    fun innocentWordsContainingShortProfanityPass() {
+        listOf("class", "cucumber", "assassin", "Fire truck").forEach { name ->
+            assertNull(nameControl(name), "'$name' should be allowed")
+        }
+    }
+
+    @Test
+    fun emojiAndSymbolsAreRefused() {
+        listOf("cat \uD83D\uDC31", "sun \u2600", "zero\u200Dwidth", "tab\there").forEach { name ->
+            assertEquals(NAME_HAS_SYMBOLS_MESSAGE, nameControl(name), "'$name' should be refused")
+        }
+    }
+
+    @Test
     fun isOwnedMatchesTheAuthor_butNeverTheUnauthoredBlank() {
         val mine = Nonogram(id = 1, difficulty = Difficulty.EASY, solution = listOf(listOf(1)), authorUid = "uid-7")
         val guests = Nonogram(id = 2, difficulty = Difficulty.EASY, solution = listOf(listOf(1)), authorUid = "local:1")

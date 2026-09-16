@@ -7,6 +7,9 @@ import androidx.lifecycle.ViewModel
 import com.trainpaths.nonogram.auth.AuthRepository
 import com.trainpaths.nonogram.classes.Difficulty
 import com.trainpaths.nonogram.classes.Nonogram
+import com.trainpaths.nonogram.classes.nameControl
+import com.trainpaths.nonogram.classes.normalizeNonogramName
+import com.trainpaths.nonogram.classes.sanitizeNameInput
 import com.trainpaths.nonogram.sync.SyncService
 import kotlinx.coroutines.CancellationException
 
@@ -36,6 +39,12 @@ class AdminViewModel(
     var selectedDifficulty by mutableStateOf(DEFAULT_REVIEW_DIFFICULTY)
         private set
 
+    /** The name an approval is filed under: the author's, unless the reviewer edits it. */
+    var name by mutableStateOf("")
+        private set
+
+    val nameProblem: String? get() = nameControl(normalizeNonogramName(name))
+
     init {
         refresh()
     }
@@ -44,15 +53,24 @@ class AdminViewModel(
         selectedDifficulty = difficulty
     }
 
+    fun updateName(value: String) {
+        name = sanitizeNameInput(value)
+    }
+
+    private fun resetReviewInputs() {
+        selectedDifficulty = DEFAULT_REVIEW_DIFFICULTY
+        name = current?.name.orEmpty()
+    }
+
     fun refresh() {
         isLoading = true
         error = null
-        selectedDifficulty = DEFAULT_REVIEW_DIFFICULTY
         launchGuarded {
             try {
                 val firebaseUid = authRepository.currentFirebaseUid
                     .orMissing { error = SIGN_IN_REQUIRED_TO_REVIEW } ?: return@launchGuarded
                 queue = syncService.pullPendingReviews(firebaseUid, REVIEW_BATCH_SIZE)
+                resetReviewInputs()
             } catch (failure: CancellationException) {
                 throw failure
             } catch (failure: Throwable) {
@@ -69,7 +87,14 @@ class AdminViewModel(
 
     private fun decide(approve: Boolean) {
         if (isDeciding) return
-        val nonogram = current ?: return
+        val pending = current ?: return
+        val problem = if (approve) nameProblem else null
+        if (problem != null) {
+            error = problem
+            return
+        }
+        // The reviewer's name only lands with an approval; a denial hands the author's own back.
+        val nonogram = if (approve) pending.copy(name = normalizeNonogramName(name)) else pending
         isDeciding = true
         error = null
         launchGuarded {
@@ -84,7 +109,7 @@ class AdminViewModel(
                     return@launchGuarded
                 }
                 queue = queue.drop(1)
-                selectedDifficulty = DEFAULT_REVIEW_DIFFICULTY
+                resetReviewInputs()
                 if (queue.isEmpty()) refresh()
             } catch (failure: CancellationException) {
                 throw failure

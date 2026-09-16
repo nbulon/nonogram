@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -28,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.trainpaths.nonogram.AppButton
 import com.trainpaths.nonogram.MAX_CONTENT_WIDTH
+import com.trainpaths.nonogram.classes.nameControl
 import com.trainpaths.nonogram.classes.normalizeNonogramName
 import com.trainpaths.nonogram.icons.scan
 import com.trainpaths.nonogram.navigation.TopAppBar
@@ -150,12 +150,9 @@ private fun ScanControls(
         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
     )
 
-    OutlinedTextField(
+    NameField(
         value = scanViewModel.name,
         onValueChange = scanViewModel::updateName,
-        label = { Text("Name") },
-        placeholder = { Text("...") },
-        singleLine = true,
         colors = textFieldColors,
         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
     )
@@ -227,7 +224,7 @@ private fun ScanControls(
             )
             onDone()
         },
-        enabled = scanViewModel.previewGrid.isNotEmpty(),
+        enabled = scanViewModel.previewGrid.isNotEmpty() && nameControl(scanViewModel.name) == null,
         modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
     )
     AppButton(

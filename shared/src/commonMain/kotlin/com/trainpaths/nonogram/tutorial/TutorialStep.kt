@@ -80,7 +80,7 @@ enum class TutorialStep(val title: String, val text: String) {
 
     GENCONF_NAME(
         title = "Name",
-        text = "Optional, up to 30 characters. Puzzles without one show as \"???\".",
+        text = "Optional, up to 30 characters, no emoji. Puzzles without one show as \"???\".",
     ),
     GENCONF_SIZE(
         title = "Grid size",

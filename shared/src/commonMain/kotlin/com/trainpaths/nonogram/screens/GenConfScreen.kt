@@ -40,6 +40,7 @@ import com.trainpaths.nonogram.auth.AuthState
 import com.trainpaths.nonogram.classes.MAX_NONOGRAM_SIDE
 import com.trainpaths.nonogram.classes.MIN_NONOGRAM_SIDE
 import com.trainpaths.nonogram.classes.PublishStatus
+import com.trainpaths.nonogram.classes.nameControl
 import com.trainpaths.nonogram.classes.normalizeNonogramName
 import com.trainpaths.nonogram.classes.sanitizeNameInput
 import com.trainpaths.nonogram.dialogs.DeleteConfirmDialog
@@ -92,14 +93,11 @@ fun GenConfScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            OutlinedTextField(
+            NameField(
                 value = name,
                 onValueChange = { name = sanitizeNameInput(it) },
-                label = { Text("Name") },
-                placeholder = { Text("...") },
-                singleLine = true,
-                enabled = !genViewModel.isSaving,
                 colors = textFieldColors,
+                enabled = !genViewModel.isSaving,
                 modifier = Modifier.tutorialAnchor(TutorialStep.GENCONF_NAME),
             )
 
@@ -168,7 +166,7 @@ fun GenConfScreen(
                         save()
                     }
                 },
-                enabled = !isBusy,
+                enabled = !isBusy && nameControl(name) == null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = if (editing) 12.dp else 32.dp)
@@ -384,6 +382,33 @@ private fun PublishSection(
             )
         }
     }
+}
+
+/** The puzzle-name input, flagging a name [nameControl] refuses. Shared with `GenScanScreen` and `AdminScreen`. */
+@Composable
+fun NameField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    colors: TextFieldColors,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    placeholder: String = "...",
+) {
+    val problem = nameControl(value)
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text("Name") },
+        placeholder = { Text(placeholder) },
+        isError = problem != null,
+        supportingText = if (problem != null) {
+            { Text(problem) }
+        } else null,
+        singleLine = true,
+        enabled = enabled,
+        colors = colors,
+        modifier = modifier,
+    )
 }
 
 /** A grid-side input: digits only, with the allowed range as its hint. Shared with `GenScanScreen`. */

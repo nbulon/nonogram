@@ -16,6 +16,7 @@ import com.trainpaths.nonogram.classes.Solver
 import com.trainpaths.nonogram.classes.Tile
 import com.trainpaths.nonogram.classes.TileState
 import com.trainpaths.nonogram.classes.isWellFormedGrid
+import com.trainpaths.nonogram.classes.nameControl
 import com.trainpaths.nonogram.classes.toSolutionInts
 import com.trainpaths.nonogram.sync.SyncService
 import com.trainpaths.nonogram.sync.syncPublicNonograms
@@ -347,6 +348,10 @@ class GenViewModel(
                 val saved = sdk.getNonogramById(nonogramId)
                 if (saved == null) {
                     publishError = "Could not send this publish request."
+                    return@launchGuarded
+                }
+                nameControl(saved.name)?.let { problem ->
+                    publishError = problem
                     return@launchGuarded
                 }
                 val conflict = sdk.hasPublishConflict(saved.solution, nonogramId, firebaseUid)

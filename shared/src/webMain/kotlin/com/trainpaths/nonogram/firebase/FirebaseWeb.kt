@@ -89,11 +89,14 @@ object FirebaseWeb {
             }.toString()
         )!!
 
+    /** [name] is nullable data rather than an optional field, so [writeName] says whether to send it. */
     internal fun makePublishStatusData(
         publishStatus: String,
         updatedAt: Long,
         difficulty: String? = null,
         authorUid: String? = null,
+        writeName: Boolean = false,
+        name: String? = null,
     ): JsAny =
         JSON.parse(
             buildJsonObject {
@@ -101,6 +104,7 @@ object FirebaseWeb {
                 put(Fields.UPDATED_AT, updatedAt)
                 if (difficulty != null) put(Fields.DIFFICULTY, difficulty)
                 if (authorUid != null) put(Fields.AUTHOR_UID, authorUid)
+                if (writeName) put(Fields.NAME, name)
             }.toString()
         )!!
 

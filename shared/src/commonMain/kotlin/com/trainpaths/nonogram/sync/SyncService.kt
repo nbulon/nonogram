@@ -47,7 +47,7 @@ interface SyncService {
     /**
      * Admin only: accepts [nonogram] at [difficulty] or denies it, and updates its author's denial
      * streak. Difficulty is the reviewer's call — authors never rate their own puzzles — so it is
-     * written only when approving.
+     * written only when approving, and so is [Nonogram.name], which carries the reviewer's edit.
      */
     suspend fun decideReview(
         firebaseUid: String,

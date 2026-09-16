@@ -30,6 +30,7 @@ import com.trainpaths.nonogram.classes.Nonogram
 import com.trainpaths.nonogram.classes.UNNAMED_NONOGRAM_TITLE
 import com.trainpaths.nonogram.navigation.TopAppBar
 import com.trainpaths.nonogram.MAX_CONTENT_WIDTH
+import com.trainpaths.nonogram.outlinedFieldColors
 import com.trainpaths.nonogram.screens.viewModel.AdminViewModel
 
 @Composable
@@ -81,10 +82,12 @@ private fun ReviewCard(nonogram: Nonogram, adminViewModel: AdminViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            nonogram.name ?: UNNAMED_NONOGRAM_TITLE,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onPrimary,
+        NameField(
+            value = adminViewModel.name,
+            onValueChange = adminViewModel::updateName,
+            colors = outlinedFieldColors(),
+            enabled = !isDeciding,
+            placeholder = UNNAMED_NONOGRAM_TITLE,
         )
         Text(
             "${nonogram.width}x${nonogram.height}",
@@ -148,7 +151,7 @@ private fun ReviewCard(nonogram: Nonogram, adminViewModel: AdminViewModel) {
             AppButton(
                 text = "Accept",
                 onClick = { adminViewModel.accept() },
-                enabled = !isDeciding,
+                enabled = !isDeciding && adminViewModel.nameProblem == null,
                 containerColor = MaterialTheme.colorScheme.onTertiary,
                 contentColor = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.weight(1f),

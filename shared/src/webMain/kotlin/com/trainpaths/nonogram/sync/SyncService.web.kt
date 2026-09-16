@@ -225,6 +225,8 @@ class FirebaseWebSyncService(private val sdk: AppSDK) : SyncService {
                 publishStatus = (if (approve) PublishStatus.APPROVED else PublishStatus.DENIED).name,
                 updatedAt = Clock.System.now().toEpochMilliseconds(),
                 difficulty = difficulty.name.takeIf { approve },
+                writeName = approve,
+                name = nonogram.name,
             ),
             FirebaseWeb.mergeOptions(),
         ).await()
