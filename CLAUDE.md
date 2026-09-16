@@ -4,8 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Kotlin Multiplatform nonogram puzzle app targeting Android, Web (JS/Wasm), and iOS (currently commented out). Users
-solve nonogram puzzles, track progress, and optionally sync via Google sign-in with Firebase.
+A Kotlin Multiplatform nonogram puzzle app targeting Android, Web (JS/Wasm), Desktop (JVM), and iOS (currently commented
+out). Users solve nonogram puzzles, track progress, and optionally sync via Google sign-in with Firebase.
 
 ## Build & Run
 
@@ -22,6 +22,10 @@ solve nonogram puzzles, track progress, and optionally sync via Google sign-in w
 # Web production bundles (against prod Firebase)
 ./gradlew :webApp:wasmJsBrowserDistribution :webApp:jsBrowserDistribution -Pnonogram.env=prod
 
+# Desktop (JVM, Compose for Desktop) — dev by default, -Pnonogram.env=prod for the prod project
+./gradlew :desktopApp:run
+./gradlew :desktopApp:packageDistributionForCurrentOS -Pnonogram.env=prod
+
 # iOS: open iosApp/ in Xcode
 ```
 
@@ -32,6 +36,7 @@ solve nonogram puzzles, track progress, and optionally sync via Google sign-in w
 ./gradlew :shared:testAndroidHostTest
 
 # Common tests only
+./gradlew :shared:desktopTest
 ./gradlew :shared:wasmJsTest
 ./gradlew :shared:jsTest
 
@@ -51,9 +56,12 @@ non-obvious *why*).
 
 ## Architecture
 
-All shared code lives in `shared/src/commonMain/`, with platform-specific code in `shared/src/androidMain/` and
-`shared/src/webMain/` (shared by the `jsMain`/`wasmJsMain` source sets — see `docs/web-architecture.md`). Platform apps
-(`androidApp/`, `webApp/`, `iosApp/`) are thin shells that initialize Koin DI and host the Compose UI.
+All shared code lives in `shared/src/commonMain/`, with platform-specific code in `shared/src/androidMain/`,
+`shared/src/desktopMain/`, `shared/src/jvmSharedMain/` (an intermediate source set both Android and desktop depend on —
+everything written against gitlive Firebase / kmpauth / Compose rather than an Android API lives there and
+`shared/src/webMain/` (shared by the `jsMain`/`wasmJsMain` source sets — see
+`docs/web-architecture.md`). Platform apps (`androidApp/`, `webApp/`, `desktopApp/`, `iosApp/`) are thin shells that
+initialize Koin DI and host the Compose UI.
 
 ### Layers
 
@@ -61,16 +69,17 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
   `generateAsync` is on so the web worker driver can be async). Builds its `Database` lazily behind a mutex on first use
   so the constructor itself stays synchronous for DI. It also **owns the dispatcher**: every method hops once through
   `dbDispatcher` (`cache/DatabaseFactory.kt`; `Dispatchers.IO` on Android where the driver blocks,
-  `EmptyCoroutineContext` on web where `Dispatchers.Default` *is* the main thread), driver creation included, which
-  it also times out (`DRIVER_TIMEOUT`) because it happens under a mutex every other call waits on. Callers
-  just `suspend` — do not wrap an `AppSDK` call in a `withContext` of your own. The one thing in a ViewModel that still
-  earns its own `Dispatchers.Default` is `GenViewModel`'s Solver run — and on web even that is the UI thread; see
+  `EmptyCoroutineContext` on web where `Dispatchers.Default` *is* the main thread), driver creation included, which it
+  also times out (`DRIVER_TIMEOUT`) because it happens under a mutex every other call waits on. Callers just `suspend` —
+  do not wrap an `AppSDK` call in a `withContext` of your own. The one thing in a ViewModel that still earns its own
+  `Dispatchers.Default` is `GenViewModel`'s Solver run — and on web even that is the UI thread; see
   `docs/web-architecture.md → One thread, and what that costs` before adding CPU-bound work.
 - **`cache/Database`** — internal class wrapping SQLDelight-generated `NonogramDb`. Maps DB rows to domain types. Not
   accessed directly outside `AppSDK`.
 - **`cache/DatabaseFactory`** — `suspend fun createDriver(): SqlDriver`, implemented per platform:
   `AndroidDatabaseFactory`
-  (androidMain, `Schema.synchronous()`), `WebDatabaseFactory` (webMain, OPFS worker driver + explicit
+  (androidMain, `Schema.synchronous()`), `DesktopDatabaseFactory` (desktopMain, file-backed JDBC driver in
+  `appDataDir`, schema handed to the driver), `WebDatabaseFactory` (webMain, OPFS worker driver + explicit
   `PRAGMA user_version` migration — see `docs/web-architecture.md`), `TestDatabaseFactory` (androidHostTest, in-memory
   JDBC).
 - **`auth/AuthRepository`** — manages auth state (`GUEST` / `SIGNED_IN`), the **user key**, and the onboarding flag via
@@ -80,8 +89,8 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
   **The user key** (`currentUserUid: StateFlow<String?>`, persisted as `current_user_uid`) is the app's *only* identity:
   the Firebase uid once signed in, `"local:<random>"` while a guest. It keys both `Nonogram.authorUid` and
   `UserProgress.userUid`, so the local tables mirror Firestore's own `users/{uid}/progress/{nonogramId}` layout.
-  `currentFirebaseUid` is the same value projected to null while a guest, for the calls that must
-  reach Firestore. The generator is open to guests, hence the local form; guests never push, so it cannot leak.
+  `currentFirebaseUid` is the same value projected to null while a guest, for the calls that must reach Firestore. The
+  generator is open to guests, hence the local form; guests never push, so it cannot leak.
   `linkFirebaseUser` migrates the guest's data onto the uid (`reassignAuthor` + `mergeProgressInto`, then drops the
   emptied guest row); a key that is already a real uid is never migrated, so signing into a second account cannot take
   the first one's data. `signOut()` mints a fresh guest key and leaves the signed-in row intact, so signing back in
@@ -96,27 +105,28 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
   **Data Model**), plus the publish-review calls (`requestPublish`,
   `fetchModerationGate`, `isAdmin`, `pullPendingReviews`, `decideReview`. The review queue is a plain `List<Nonogram>`:
   the author rides along in `authorUid`, so there is no wrapper type; pure streak/ban helpers live in
-  `sync/Moderation.kt`). `sync/FirebaseAndroidSyncService` (androidMain)
-  implements it with `dev.gitlive:firebase-firestore`; web binds `sync/FirebaseWebSyncService` (webMain), built on
-  hand-written Kotlin externals to the Firebase JS SDK in `firebase/` (see `docs/web-architecture.md` for the externals
-  pattern and the auth-session gate). Same Firestore shape on both platforms, so data interoperates.
+  `sync/Moderation.kt`). `sync/FirebaseJvmSyncService` (jvmSharedMain — Android and desktop) implements it with
+  `dev.gitlive:firebase-firestore`; web binds `sync/FirebaseWebSyncService` (webMain), built on hand-written Kotlin
+  externals to the Firebase JS SDK in `firebase/` (see `docs/web-architecture.md` for the externals pattern and the
+  auth-session gate). Same Firestore shape on both platforms, so data interoperates.
 
   **The platform services are adapters, not logic.** Anything two implementations would otherwise write twice lives in
   commonMain beside `SyncService`, because every duplicated piece had already drifted once: `FirestoreSchema.kt`
   (`Paths` / `Fields` — every collection path and field name, mirrored a second time by the web externals' property
-  names and a third by the console-managed Firestore rules), `RemoteProgress.kt` (`mergeRemoteProgress` / `applyRemoteProgress` /
+  names and a third by the console-managed Firestore rules), `RemoteProgress.kt` (`mergeRemoteProgress` /
+  `applyRemoteProgress` /
   `uploadAllProgress`, the mirror of `mergeRemoteNonograms`) and `NonogramDocument.kt` (the wire document plus
-  `toNonogram(onSkip)` — decoding, `isWellFormedGrid`, and the enum fallbacks that let an older writer's document
-  read on a newer client; `encodeSolution` is the write side). A platform contributes a fetch (`fetchProgress`,
+  `toNonogram(onSkip)` — decoding, `isWellFormedGrid`, and the enum fallbacks that let an older writer's document read
+  on a newer client; `encodeSolution` is the write side). A platform contributes a fetch (`fetchProgress`,
   `parseNonograms` + its snapshot → `NonogramDocument` adapter), the document writes, and its error handling:
   `gated(uid, label, fallback) { }` on web (session check + catch), `logged(label, fallback) { }` on Android (catch).
   Put new merge or mapping rules in commonMain and let both platforms call them.
 - **`classes/` board + game** — the interactive grid (clues, tiles, pan/zoom, drag-to-draw) is a self-contained Compose
   engine: `Board`/`BoardTransform` (one Canvas for all tiles + a layer-transform pan/zoom model),
-  `Game` (win check), `Tile`/`TileState`, `ClueProgress` (which clues the player has certainly drawn,
-  struck out in the game screen's gutters), and `RezoomButton` — fit-to-screen, floating over the board's top-left
-  on a translucent scrim and shown only while the board is zoomed in (`BoardTransformState.canReset`).
-  Performance-critical and gesture-heavy — see `docs/board-rendering.md`.
+  `Game` (win check), `Tile`/`TileState`, `ClueProgress` (which clues the player has certainly drawn, struck out in the
+  game screen's gutters), and `RezoomButton` — fit-to-screen, floating over the board's top-left on a translucent scrim
+  and shown only while the board is zoomed in (`BoardTransformState.canReset`). Performance-critical and gesture-heavy —
+  see `docs/board-rendering.md`.
 - **Desktop widths** — `MAX_CONTENT_WIDTH = 1000.dp` lives in `AppTheme.kt` alongside the palettes, applied as
   `Modifier.widthIn(max = …)` ahead of any `fillMax*` and centred by the screen root's `horizontalAlignment`. App bars
   stay full-bleed with capped content, the Board is deliberately exempt, and `NonogramGrid` picks its column count from
@@ -131,8 +141,8 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
   `FilterScreen` for (`FilterRoute(generator)`, a flag so `App.kt` binds the right ViewModel):
   `query`, a case-insensitive name search that drops unnamed puzzles while non-blank, and `sizeRange`, a bound on
   `Nonogram.longerSide` edited through text fields and a `RangeSlider` (`withMinSize`/`withMaxSize` keep the ends
-  ordered and inside `FULL_SIZE_RANGE`). The screen applies every edit live, so back just pops. With no sort chosen
-  the menu lists own puzzles first and the generator lists latest-updated first.
+  ordered and inside `FULL_SIZE_RANGE`). The screen applies every edit live, so back just pops. With no sort chosen the
+  menu lists own puzzles first and the generator lists latest-updated first.
 - **`tutorial/`** — the first-run hint overlay: `TutorialStep` (an enum whose declaration order is priority order,
   carrying the copy), `TutorialRepository` (one `tutorial_seen_<STEP>` boolean per step, device-wide so it survives
   sign-out), `TutorialController` + `Modifier.tutorialAnchor(step)`
@@ -143,9 +153,10 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
 - **`classes/Solver`** — line-logic solver; run via `Nonogram.isValid` to check a puzzle is uniquely solvable (gates
   publishing). **User-owned and actively changing — do not document its internals or modify it.**
 - **`screens/GoogleSignInSection`** — `expect`/`actual` composable for the Google sign-in button, both actuals built on
-  kmpauth's `GoogleSignInButton` + a `SignInState`. Android uses `rememberGoogleAuthState`, which exchanges the
-  credential for a Firebase session through kmpauth's own Firebase backend (auto-registered from `kmpauth-firebase`) and
-  hands back a `KMPAuthUser`. Web uses `rememberGoogleSignInState` — credential only — and does the exchange itself via
+  kmpauth's `GoogleSignInButton` + a `SignInState`. Android and desktop (one actual, jvmSharedMain) use
+  `rememberGoogleAuthState`, which exchanges the credential for a Firebase session through kmpauth's own Firebase
+  backend (auto-registered from `kmpauth-firebase`) and hands back a `KMPAuthUser`. Web uses
+  `rememberGoogleSignInState` — credential only — and does the exchange itself via
   `FirebaseWeb.signInWithGoogle`, because the web sync gate reads the Firebase JS SDK's auth state (see
   `docs/web-architecture.md`). Both skip `KMPAuthUserCancelledException` rather than logging a dismissed prompt.
 - **ViewModels** (`screens/viewModel/`) — Compose state holders using `mutableStateOf`. `GameViewModel` manages the tile
@@ -156,20 +167,20 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
   `syncAll` pulls progress + public + owned nonograms in one pass (separate public/owned cursors read via
   `AuthRepository`) and then refreshes the admin flag and publish ban (`isAdmin` / `publishBanned` StateFlows),
   `retryOwnNonograms` re-runs just the owned stream for the generator's retry button. The **public** stream runs first,
-  before the `currentFirebaseUid` gate, so guests pull public puzzles too — approved puzzles are
-  readable unauthenticated (enforced by the Firestore rules), while progress, owned puzzles and the admin/moderation reads all
+  before the `currentFirebaseUid` gate, so guests pull public puzzles too — approved puzzles are readable
+  unauthenticated (enforced by the Firestore rules), while progress, owned puzzles and the admin/moderation reads all
   need a session and stay behind the gate. `AdminViewModel` drives the admin review queue (one pending request at a
   time, buffered a batch at a time). All depend on the suspend `AppSDK`/`SyncService` from inside
   `viewModelScope.launch` — but always via `launchGuarded` (`screens/viewModel/LaunchGuarded.kt`), never
   `viewModelScope.launch` directly: an uncaught throwable in a plain launch reaches the default handler and kills the
   process on Android. It rethrows `CancellationException` and routes everything else to `onError`; UI flags that gate a
-  screen (`isLoading`, `_signInComplete`) are released in a `finally` inside the block, so a failed read can never
-  leave a spinner up forever.
+  screen (`isLoading`, `_signInComplete`) are released in a `finally` inside the block, so a failed read can never leave
+  a spinner up forever.
 
   **A missing uid** goes through `String?.orMissing` (`screens/viewModel/SignedIn.kt`) rather than a bare
-  `?: return`, so a guard is never silent. Its default handler just logs, which is what a background pass wants;
-  the four sites where the user is waiting on the result override it to set the screen's error state instead
-  (`saveError`, `publishError`, `AdminViewModel.error`). The two uid sources are not the same condition — a null
+  `?: return`, so a guard is never silent. Its default handler just logs, which is what a background pass wants; the
+  four sites where the user is waiting on the result override it to set the screen's error state instead (`saveError`,
+  `publishError`, `AdminViewModel.error`). The two uid sources are not the same condition — a null
   `currentUserUid` is an anomaly (auth not initialized), a null `currentFirebaseUid` is just a guest.
 
   **When sync runs.** `syncAll` fires once from `AppContent`'s app-start `LaunchedEffect`, and after that only when the
@@ -184,8 +195,8 @@ All shared code lives in `shared/src/commonMain/`, with platform-specific code i
   **Every remote pass is bounded.** `syncAllNow`, `retryOwnNonograms` and the post-sign-in sync wrap their work in
   `withTimeoutOrNull(SYNC_TIMEOUT)`, and the fire-and-forget `syncAll`/`retryOwnNonograms`/`signOut` release their
   `onComplete` under `NonCancellable + Dispatchers.Main`. Both exist because a Firestore promise on web can neither be
-  cancelled nor relied on to settle — see `docs/web-architecture.md → One thread, and what that costs`. The two
-  sync services' `gated`/`logged` wrappers rethrow `CancellationException` so the timeout actually unwinds.
+  cancelled nor relied on to settle — see `docs/web-architecture.md → One thread, and what that costs`. The two sync
+  services' `gated`/`logged` wrappers rethrow `CancellationException` so the timeout actually unwinds.
 
 ### Navigation
 
@@ -221,11 +232,11 @@ pass `backArrow = true` to force a plain back arrow (used in `GenConf`).
 drawing, history, board, in that order — each a `ToolGroup` of adjacent items, the separation coming from the computed
 gap the parent `Row` spaces them by rather than any divider or container. The **drawing** group is one button per
 `DrawMode` (Fill / Cross / Erase), the active one highlighted; there is no cycling tool button and no Toggle mode —
-every mode writes its state idempotently. The **history** group is undo/redo. The **board** group is the
-**lock/unlock** toggle (locked = one-finger drag draws, unlocked = drag pans — see `docs/board-rendering.md`), the
-(GenScreen) **Save** icon (enabled only for a new or dirty puzzle) and the **Check** icon (a magnifying glass, on both
-screens, and it fits the board back on screen as well as marking cells — mistakes in GameScreen, cells the Solver
-cannot pin down in GenScreen, where the icon itself is tinted green/red with the verdict). Rezoom is *not* here — it floats over the
+every mode writes its state idempotently. The **history** group is undo/redo. The **board** group is the **lock/unlock**
+toggle (locked = one-finger drag draws, unlocked = drag pans — see `docs/board-rendering.md`), the (GenScreen) **Save**
+icon (enabled only for a new or dirty puzzle) and the **Check** icon (a magnifying glass, on both screens, and it fits
+the board back on screen as well as marking cells — mistakes in GameScreen, cells the Solver cannot pin down in
+GenScreen, where the icon itself is tinted green/red with the verdict). Rezoom is *not* here — it floats over the
 board's own top-left (see `classes/` above), where it can be hidden whenever the board is already fitted.
 
 A `ToolGroup` with a `title` labels the cluster as a whole and its buttons carry no labels of their own — that is what
@@ -235,16 +246,19 @@ height (pill + one text line), which is what keeps every icon on one line.
 
 Both screens render 7 buttons, which does not fit a phone at a fixed width, so `BoxWithConstraints` sizes them: the
 icon-only buttons take a fixed `ICON_ITEM_WIDTH`, the labelled ones split what is left and ellipsize rather than
-overflow, and the group gap absorbs the remainder (clamped, with the row centred) — **the gaps are subtracted before
-the items are sized**, because handing the items the full width leaves the arrangement no slack and the grouping
-silently disappears. Icons come from the hand-built `icons/` package of `ImageVector`s.
+overflow, and the group gap absorbs the remainder (clamped, with the row centred) — **the gaps are subtracted before the
+items are sized**, because handing the items the full width leaves the arrangement no slack and the grouping silently
+disappears. Icons come from the hand-built `icons/` package of `ImageVector`s.
 
 ### DI (Koin)
 
 - `di/AppModule.kt` — common singletons: `AppSDK`, `Settings`, `AuthRepository`, `SettingsRepository`, plus all
   ViewModel registrations via `viewModelOf` (koin-core-viewmodel, shared across platforms).
 - `di/AndroidModule.kt` — platform bindings: `DatabaseFactory` → `AndroidDatabaseFactory`, `SyncService` →
-  `FirebaseAndroidSyncService`.
+  `FirebaseJvmSyncService`.
+- `di/DesktopModule.kt` (desktopMain) — `desktopModule(dataDir)`: `DatabaseFactory` → `DesktopDatabaseFactory`,
+  `SyncService` → `FirebaseJvmSyncService`, plus a `Settings` override on a per-environment `Preferences` node (the only
+  binding a platform module redefines — `main` lists `appModule` first so it wins).
 - `di/WebModule.kt` (webMain) — platform bindings: `DatabaseFactory` → `WebDatabaseFactory`, `SyncService` →
   `FirebaseWebSyncService`.
 
@@ -254,8 +268,8 @@ silently disappears. Icons come from the hand-built `icons/` package of `ImageVe
   `name: String?`, `authorUid` (the user key — see `auth/AuthRepository`; the same string as the Firestore
   `authorUid` field, so no local↔remote translation is needed), `updatedAt`, `publishStatus` (enum:
   NONE/PENDING/DENIED/UNLISTED/APPROVED/VALID/DELETED, stored as its ordinal in the DB column `status`, as its name in
-  the Firestore field `publishStatus`). **`publishStatus` also carries the Solver verdict**, because the two axes are not
-  independent: publication may only be requested from `VALID`, so every state past `NONE` was reached by passing the
+  the Firestore field `publishStatus`). **`publishStatus` also carries the Solver verdict**, because the two axes are
+  not independent: publication may only be requested from `VALID`, so every state past `NONE` was reached by passing the
   Solver and `NONE` is the only state a puzzle that is not uniquely solvable can be in. That is what lets
   `GenListScreen` read its status dot off the column (`isKnownValid get() = publishStatus != NONE`) instead of
   re-solving every puzzle it shows; `GenViewModel.afterSave` is the one place the stored status is derived from a fresh
@@ -265,9 +279,9 @@ silently disappears. Icons come from the hand-built `icons/` package of `ImageVe
   delete, so a stale copy on another of the author's devices cannot push it back to life), and `mergeRemoteNonograms`
   removes the local row when it pulls one — delete wins regardless of timestamps — so the DB never stores it and no
   query has to filter it out. Other players who already pulled a public copy keep it, the same way `UNLISTED` does not
-  propagate: the public pull only ever fetches `APPROVED` docs. Visibility is derived, not
-  stored: `isPublic get() = publishStatus == APPROVED`, and the author's on/off switch moves an approved puzzle between
-  APPROVED and UNLISTED. Computes `rowClues`/`colClues` on the fly, and `isValid` lazily via the `Solver`. Name helpers live
+  propagate: the public pull only ever fetches `APPROVED` docs. Visibility is derived, not stored:
+  `isPublic get() = publishStatus == APPROVED`, and the author's on/off switch moves an approved puzzle between APPROVED
+  and UNLISTED. Computes `rowClues`/`colClues` on the fly, and `isValid` lazily via the `Solver`. Name helpers live
   alongside: `MAX_NONOGRAM_NAME_LENGTH` (30), `normalizeNonogramName()`, `UNNAMED_NONOGRAM_TITLE`, and
   `nonogramNameProblem()` — the client-side name gate (emoji/symbols, plus the substring blocklist in
   `classes/NameBlocklist.kt`), returning the message to show or null; a blank name is always fine. The shared
@@ -275,27 +289,27 @@ silently disappears. Icons come from the hand-built `icons/` package of `ImageVe
   `AdminViewModel.accept` refuse a name it rejects. Ownership is
   `isOwned(uid)`, which never matches the blank `authorUid` seeded puzzles carry. Grid shape lives here too:
   `MIN_NONOGRAM_SIDE` (5) / `MAX_NONOGRAM_SIDE` (60), clamped in `GenViewModel.setNonogram`/`resizeNonogram` and shown
-  in `GenConfScreen`'s size fields, plus `isRectangularGrid()` / `isWellFormedGrid()`. Both sync services reject a
-  grid failing `isWellFormedGrid()` in `parseNonograms` (ragged grids crash `colClues`), and the DB mapper falls back
-  to an empty solution for one already stored — keep `MAX_NONOGRAM_SIDE` in step with the 20 000-character cap
-  the Firestore rules put on the encoded `solution`.
+  in `GenConfScreen`'s size fields, plus `isRectangularGrid()` / `isWellFormedGrid()`. Both sync services reject a grid
+  failing `isWellFormedGrid()` in `parseNonograms` (ragged grids crash `colClues`), and the DB mapper falls back to an
+  empty solution for one already stored — keep `MAX_NONOGRAM_SIDE` in step with the 20 000-character cap the Firestore
+  rules put on the encoded `solution`.
 - **`Tile`** — mutable Compose state. Cycles: NONE → FILLED → CROSSED → NONE.
-- Grids are serialized as `List<List<Int>>` (JSON, `classes/SolutionCodec.kt`), but in **two different
-  encodings**, and `Tile.kt` names them apart. A puzzle `solution` is 0/1 — `toSolutionInts()`, which collapses
+- Grids are serialized as `List<List<Int>>` (JSON, `classes/SolutionCodec.kt`), but in **two different encodings**, and
+  `Tile.kt` names them apart. A puzzle `solution` is 0/1 — `toSolutionInts()`, which collapses
   `CROSSED` to 0; that is what the win check (`GameScreen`) and the generator (`GenViewModel`) want, and
-  `computeLineClues` would misread anything else. A **saved board** (`UserProgress.boardState`, and the same
-  string in Firestore) is 0/1/2 — `toProgressInts()` / `progressIntToTileState()`, where 2 is a cross, because
-  crosses are the solver's own working-out and have to survive leaving the puzzle. `progressIntToTileState`
-  falls back to `NONE`, so the 0/1 rows written before crosses were persisted still load unchanged. The layers
-  in between (codec, DB column, both `SyncService`s) never inspect the values.
+  `computeLineClues` would misread anything else. A **saved board** (`UserProgress.boardState`, and the same string in
+  Firestore) is 0/1/2 — `toProgressInts()` / `progressIntToTileState()`, where 2 is a cross, because crosses are the
+  solver's own working-out and have to survive leaving the puzzle. `progressIntToTileState`
+  falls back to `NONE`, so the 0/1 rows written before crosses were persisted still load unchanged. The layers in
+  between (codec, DB column, both `SyncService`s) never inspect the values.
 - **`cache/SeedPuzzles.kt`** — the built-in puzzles, **generated**: `./gradlew :seedTool:run` rewrites it from every
-  `APPROVED` puzzle in the *dev* Firestore project, so it is a projection with no state of its own and each seed's id
-  is its dev document id. Each solution is stored as a `0`/`1` row string (`SeedPuzzle.rows`, one row per line,
-  decoded by `String.toBinaryGrid()` in `classes/SolutionCodec.kt`) rather than nested `listOf`s, so the file's
-  static initializer holds one string constant per puzzle instead of one vararg element per cell — that is what
-  kept it under the JVM method-size limit. `AppInitializer.initializeApp` calls `AppSDK.seedIfEmpty()` once at startup, before
-  `AuthRepository.initialize()` and so before any ViewModel reads the table; the guard is a `SELECT count(*)`, since
-  an empty table is the first launch (and the one web storage eviction leaves behind). See `docs/seeding.md` — do not
+  `APPROVED` puzzle in the *dev* Firestore project, so it is a projection with no state of its own and each seed's id is
+  its dev document id. Each solution is stored as a `0`/`1` row string (`SeedPuzzle.rows`, one row per line, decoded by
+  `String.toBinaryGrid()` in `classes/SolutionCodec.kt`) rather than nested `listOf`s, so the file's static initializer
+  holds one string constant per puzzle instead of one vararg element per cell — that is what kept it under the JVM
+  method-size limit. `AppInitializer.initializeApp` calls `AppSDK.seedIfEmpty()` once at startup, before
+  `AuthRepository.initialize()` and so before any ViewModel reads the table; the guard is a `SELECT count(*)`, since an
+  empty table is the first launch (and the one web storage eviction leaves behind). See `docs/seeding.md` — do not
   hand-edit the file.
 
 ### SQLDelight
@@ -363,28 +377,30 @@ defined.
   `bundleProdRelease` and friends, never a bare `assembleDebug`. The `dev` flavor carries
   `applicationIdSuffix = ".dev"` (and its own `app_name` in `androidApp/src/dev/res`), so it installs as
   `com.trainpaths.nonogram.dev` alongside the prod build rather than colliding with it — which means
-  `com.trainpaths.nonogram.dev` is registered as its **own Android app** in the dev Firebase project, with the
-  debug SHA-1 on that app; `namespace` stays unsuffixed. Web selects one with the Gradle property
-  `nonogram.env` (`dev` by default in `gradle.properties`, `-Pnonogram.env=prod` to switch), which picks the
-  source directory holding `FirebaseWebConfig.kt`: `webApp/src/dev` or `webApp/src/prod`, one line
-  of `kotlin.srcDir` in `webApp/build.gradle.kts`. The two files declare the same object, so callers never see
-  the switch — but a new constant has to be added to both. Both are public-by-design client config; the only
-  gitignored secrets are `keystore.properties` / `*.jks`. 
+  `com.trainpaths.nonogram.dev` is registered as its **own Android app** in the dev Firebase project, with the debug
+  SHA-1 on that app; `namespace` stays unsuffixed. Web selects one with the Gradle property
+  `nonogram.env` (`dev` by default in `gradle.properties`, `-Pnonogram.env=prod` to switch), which picks the source
+  directory holding `FirebaseConfig.web.kt`: `webApp/src/dev` or `webApp/src/prod`, one line of `kotlin.srcDir` in
+  `webApp/build.gradle.kts`. The two files declare the same object, so callers never see the switch — but a new constant
+  has to be added to both. Desktop does the same with
+  `desktopApp/src/{dev,prod}/kotlin/.../FirebaseConfig.desktop.kt`, whose `DATA_DIR_NAME` (`Nonogram-dev` /
+  `Nonogram`) keeps the two builds' database, auth store and preferences apart; `FirebaseDesktop.initialize`
+  (desktopMain) boots gitlive's firebase-java-sdk from it, before Koin. Both are public-by-design client config; the
+  only gitignored secrets are `keystore.properties` / `*.jks`.
 - **App Check** — **Android only.** Play Integrity in `prod`, the debug provider in `dev`, installed in
-  `MainApplication.onCreate` *before* `startKoin` (Koin builds `FirebaseAndroidSyncService`, which touches
-  Firestore) via `installAppCheck()`, which has one copy **per flavor** (`androidApp/src/{dev,prod}/`), with the
-  provider artifacts scoped `devImplementation` / `prodImplementation` to match. Provider therefore tracks the
-  Firebase project, not debuggability, which encodes the project's rule — **debug against dev, build for
-  prod**. `devDebug` is the variant to develop in; `prodRelease` is what ships; `devRelease` is only the local
-  R8 smoke test. `prodDebug` is not used: once prod App Check is enforced it cannot reach Firestore, since
-  Play Integrity cannot attest a sideloaded APK. **Web has no App Check** — reCAPTCHA v3 no longer has a free
-  tier, so the provider, its externals and `RECAPTCHA_SITE_KEY` were removed; `FirebaseWeb.initialize` just
-  builds the app and hands back auth + Firestore. Anything web-facing must therefore stay unenforced in the
-  Firebase console.
+  `MainApplication.onCreate` *before* `startKoin` (Koin builds `FirebaseJvmSyncService`, which touches Firestore) via
+  `installAppCheck()`, which has one copy **per flavor** (`androidApp/src/{dev,prod}/`), with the provider artifacts
+  scoped `devImplementation` / `prodImplementation` to match. Provider therefore tracks the Firebase project, not
+  debuggability, which encodes the project's rule — **debug against dev, build for prod**. `devDebug` is the variant to
+  develop in; `prodRelease` is what ships; `devRelease` is only the local R8 smoke test. `prodDebug` is not used: once
+  prod App Check is enforced it cannot reach Firestore, since Play Integrity cannot attest a sideloaded APK. **Web has
+  no App Check** — reCAPTCHA v3 no longer has a free tier, so the provider, its externals and `RECAPTCHA_SITE_KEY` were
+  removed; `FirebaseWeb.initialize` just builds the app and hands back auth + Firestore. **Desktop has none either.**
+  Anything web- or desktop-facing must therefore stay unenforced in the Firebase console.
 - `AppInitializer.onApplicationStart()` calls `KMPAuth.initialize { google(serverId = …) }` with a web client ID.
   Android passes `R.string.default_web_client_id` (generated from the flavor's `google-services.json`); web passes
-  `FirebaseWebConfig.GOOGLE_WEB_CLIENT_ID`. The two must be the same OAuth web client within an environment, or the
-  platforms mint different Firebase users.
+  `FirebaseWebConfig.GOOGLE_WEB_CLIENT_ID`, desktop `FirebaseDesktopConfig.GOOGLE_WEB_CLIENT_ID`. All must be the same
+  OAuth web client within an environment, or the platforms mint different Firebase users.
 - Firestore paths: `users/{firebaseUid}/progress/{nonogramId}` (progress), `nonograms/{id}` (puzzles — own + public per
   their `publishStatus` field), `users/{firebaseUid}` (`denialStreak` /
   `publishBanned`) and `admins/{firebaseUid}` (admin roster). Puzzles are pulled incrementally by
@@ -397,16 +413,16 @@ defined.
   upsert; local newer & locally authored → push back. On both platforms — Android via
   `dev.gitlive:firebase-firestore` (androidMain), web via hand-written Firebase JS SDK externals (webMain), both
   isolated behind `sync/SyncService`; the web impl gates every call on `sessionMatches` *except* the public pull, which
-  must work signed out. Security rules are **not** checked in — they are maintained per project in the Firebase
-  console (the last tracked copy is `git show fix/admin-panel:firestore.rules`). They are what actually enforces
-  publish moderation, and the `nonograms` read rule deliberately allows unauthenticated reads of `APPROVED` docs; a
-  rule change has to be applied to dev and prod separately. Two composite indexes are needed on `nonograms` —
+  must work signed out. Security rules are **not** checked in — they are maintained per project in the Firebase console
+  (the last tracked copy is `git show fix/admin-panel:firestore.rules`). They are what actually enforces publish
+  moderation, and the `nonograms` read rule deliberately allows unauthenticated reads of `APPROVED` docs; a rule change
+  has to be applied to dev and prod separately. Two composite indexes are needed on `nonograms` —
   `(publishStatus, updatedAt)` (public pull + review queue) and `(authorUid, updatedAt)` (owned pull) — likewise
   configured in the console, not checked in.
 - `auth/PlatformAuth.kt` declares `expect suspend fun firebaseSignOut()`, ending the platform Firebase session —
-  `dev.gitlive.firebase.auth.auth.signOut()` on Android, `FirebaseWeb.signOut()` (a new `firebase/auth` `signOut`
-  external) on web. `AuthViewModel.signOut()` calls it before `AuthRepository.signOut()`, swallowing failures so local
-  sign-out still proceeds if the platform call errors.
+  `dev.gitlive.firebase.auth.auth.signOut()` on Android and desktop (jvmSharedMain), `FirebaseWeb.signOut()` (a
+  `firebase/auth` `signOut` external) on web. `AuthViewModel.signOut()` calls it before `AuthRepository.signOut()`,
+  swallowing failures so local sign-out still proceeds if the platform call errors.
 
 ## Current State
 
@@ -418,10 +434,10 @@ still saves if it fails or the check throws) and only gates whether the author m
 **only** place the Solver's verdict is *persisted* — into `publishStatus` (see **Data Model**), so the list screen and
 the config screen both read it rather than recomputing it. `GenViewModel.checkBoard`, behind `GenScreen`'s bottom-bar
 **Check** button, runs the Solver a second time but purely for the author's benefit: it outlines the cells line logic
-cannot pin down and moves `validationState` only, writing nothing (see `docs/board-rendering.md`). Publishing
-itself is admin-moderated: the generator's config screen offers a "Request publish" button, an admin accepts or denies
-in `AdminScreen` (reachable from Settings), and five denials in a row ban a user from requesting. Editing a puzzle that
-is currently public un-publishes it, so every save path first confirms via `PublicEditConfirmDialog`. A request is also
+cannot pin down and moves `validationState` only, writing nothing (see `docs/board-rendering.md`). Publishing itself is
+admin-moderated: the generator's config screen offers a "Request publish" button, an admin accepts or denies in
+`AdminScreen` (reachable from Settings), and five denials in a row ban a user from requesting. Editing a puzzle that is
+currently public un-publishes it, so every save path first confirms via `PublicEditConfirmDialog`. A request is also
 refused when the grid is already spoken for — `AppSDK.hasPublishConflict` (the `selectPublishConflictId`
 query) matches the saved `solution` against any `APPROVED` puzzle and against the author's own `UNLISTED`/`PENDING`
 copies, and `requestPublish` reports it through `publishError` before anything reaches Firestore. It first runs
@@ -431,12 +447,16 @@ The match is exact — mirrored, rotated or padded grids are different puzzles. 
 `GenViewModel` authors every puzzle as `EASY` (no selector), and `AdminScreen`'s four difficulty buttons — defaulting to
 `MEDIUM` — decide what `SyncService.decideReview` writes alongside `APPROVED`, which every other device picks up on its
 next public pull. **So is the name**: `AdminScreen` shows it in an editable `NameField`, and an approval writes
-`AdminViewModel.name` (normalized, name-gate checked) to the `name` field the same way — a denial leaves the
-author's name alone. An author deletes a puzzle from the same config screen (`DeleteConfirmDialog` → `GenViewModel.deleteNonogram`):
-a signed-in author tombstones the Firestore doc first and keeps the local row if that is refused, a guest just drops
-the local row (`AppSDK.deleteNonogram`, progress rows included). The Firestore rules must let the author write
+`AdminViewModel.name` (normalized, name-gate checked) to the `name` field the same way — a denial leaves the author's
+name alone. An author deletes a puzzle from the same config screen (`DeleteConfirmDialog` →
+`GenViewModel.deleteNonogram`):
+a signed-in author tombstones the Firestore doc first and keeps the local row if that is refused, a guest just drops the
+local row (`AppSDK.deleteNonogram`, progress rows included). The Firestore rules must let the author write
 `publishStatus = DELETED` — on update from any prior state, and on create (a puzzle whose push never landed).
 
 Web (js + wasmJs) has persistent OPFS storage plus Google sign-in and Firestore sync via hand-written Firebase JS SDK
 externals in `shared/src/webMain` (no gitlive — it doesn't publish wasmJs; see `docs/web-architecture.md` for the
 externals pattern, the kmpauth One Tap / token-client caveat, and the auth-session restore gate).
+
+Desktop (JVM) runs the Android sync and sign-in code unchanged from `jvmSharedMain` on top of gitlive's
+firebase-java-sdk, with a file-backed JDBC database and auth store in a per-environment app data director

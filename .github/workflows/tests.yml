@@ -20,6 +20,8 @@ jobs:
         include:
           - name: android
             task: ':shared:testAndroidHostTest'
+          - name: desktop
+            task: ':shared:desktopTest'
           - name: js
             task: ':shared:jsBrowserTest'
           - name: wasmJs

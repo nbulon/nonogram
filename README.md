@@ -4,6 +4,7 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 options:
 
 - Android app: `./gradlew :androidApp:assembleDebug`
+- Desktop app: `./gradlew :desktopApp:run` (`-Pnonogram.env=prod` for the prod Firebase project)
 - Web app: see the **Web app** section below.
 
 ### Web app
@@ -23,6 +24,7 @@ Before running the dev browser after npm dependencies have changed (after pullin
 Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 
 - Android tests: `./gradlew :shared:testAndroidHostTest`
+- Desktop tests: `./gradlew :shared:desktopTest`
 - Web tests:
     - Wasm target: `./gradlew :shared:wasmJsTest`
     - JS target: `./gradlew :shared:jsTest`
