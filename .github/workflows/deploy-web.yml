@@ -36,12 +36,12 @@ jobs:
       # Overrides gradle.properties, so build stays a single low-priority JVM
       - name: Build web distributions (prod)
         env:
-          NODE_OPTIONS: --max-old-space-size=512
+          NODE_OPTIONS: --max-old-space-size=580
         run: |
           nice -n 15 ./gradlew :webApp:wasmJsBrowserDistribution :webApp:jsBrowserDistribution \
             -Pnonogram.env=prod \
             --no-daemon --no-parallel --max-workers=1 \
-            -Dorg.gradle.jvmargs="-Xmx1280m -XX:MaxMetaspaceSize=256m -XX:+UseSerialGC -XX:MaxHeapFreeRatio=20 -XX:MinHeapFreeRatio=10 -Dfile.encoding=UTF-8" \
+            -Dorg.gradle.jvmargs="-Xmx1380m -XX:MaxMetaspaceSize=370m -XX:+UseSerialGC -XX:MaxHeapFreeRatio=20 -XX:MinHeapFreeRatio=10 -Dfile.encoding=UTF-8" \
             -Pkotlin.compiler.execution.strategy=in-process
 
       - name: Build image on the host and restart the container
