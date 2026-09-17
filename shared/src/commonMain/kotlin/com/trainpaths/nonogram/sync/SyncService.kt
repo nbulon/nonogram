@@ -9,9 +9,6 @@ import kotlin.time.Clock
 
 interface SyncService {
     suspend fun pushProgress(firebaseUid: String, nonogramId: Long, boardState: String?, updatedAt: Long)
-    suspend fun hasRemoteProgress(firebaseUid: String): Boolean
-    suspend fun uploadAllLocalProgress(firebaseUid: String)
-    suspend fun pullAllProgress(firebaseUid: String)
     suspend fun pullAndMergeAllProgress(firebaseUid: String)
 
     /**
@@ -19,12 +16,10 @@ interface SyncService {
      */
     suspend fun pushNonogram(firebaseUid: String, nonogram: Nonogram, writePublishStatus: Boolean = false)
 
-    /** Pushes every locally authored puzzle; runs on each sign-in, after the owned pull has merged. */
-    suspend fun uploadAllLocalNonograms(firebaseUid: String)
-
     /** Runs for guests too ([firebaseUid] null): approved puzzles are readable unauthenticated. */
     suspend fun pullPublicNonogramsSince(firebaseUid: String?, since: Long): Long?
 
+    /** A full pull (`since == 0`) also pushes the author's local puzzles the remote does not have. */
     suspend fun pullOwnedNonograms(firebaseUid: String, since: Long): Long?
 
     /** Moves the puzzle to `PENDING`. Returns false when the rules reject it (e.g. banned author). */
@@ -64,13 +59,16 @@ interface SyncService {
  * whatever the timestamps say, otherwise remote newer → upsert locally, local newer and locally
  * authored → push back. Returns the newest received `updatedAt` timestamp for the next
  * incremental fetch. A null [firebaseUid] is a guest's unauthenticated public pull: merge in,
- * never push back.
+ * never push back. [pushLocalOnly] is for the one pull that sees the whole remote set — a full
+ * owned pull — and pushes the author's puzzles the remote has never seen (guest-authored ones a
+ * sign-in just moved onto the uid).
  */
 internal suspend fun SyncService.mergeRemoteNonograms(
     sdk: AppSDK,
     firebaseUid: String?,
     lastSyncedAt: Long,
     remotes: List<Nonogram>,
+    pushLocalOnly: Boolean = false,
 ): Long {
     var newestReceivedAt = lastSyncedAt
     val now = Clock.System.now().toEpochMilliseconds()
@@ -96,6 +94,12 @@ internal suspend fun SyncService.mergeRemoteNonograms(
             local.authorUid == firebaseUid
         ) {
             pushNonogram(firebaseUid, local)
+        }
+    }
+    if (pushLocalOnly && firebaseUid != null) {
+        val remoteIds = remotes.mapTo(HashSet()) { it.id }
+        for (local in sdk.getNonogramsByAuthor(firebaseUid)) {
+            if (local.id !in remoteIds) pushNonogram(firebaseUid, local)
         }
     }
     return newestReceivedAt

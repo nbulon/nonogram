@@ -127,7 +127,6 @@ private fun AppContent(
                         authViewModel = authViewModel,
                         onLoginSuccess = {
                             menuViewModel.reload(true)
-                            authViewModel.syncAll { menuViewModel.reload() }
                             navController.navigate(MenuRoute) {
                                 popUpTo(LoginRoute) { inclusive = true }
                             }
@@ -333,9 +332,7 @@ private fun AppContent(
                         tutorialRepository = tutorialRepository,
                         onBack = { navController.popBackStack() },
                         onAdminPanel = { navController.navigate(AdminRoute) },
-                        onSignedIn = {
-                            authViewModel.syncAll { menuViewModel.reload() }
-                        },
+                        onSignedIn = { menuViewModel.reload() },
                         onSignOut = {
                             authViewModel.signOut {
                                 menuViewModel.reload(true)

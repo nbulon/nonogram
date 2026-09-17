@@ -62,30 +62,24 @@ class AuthViewModel(
         ) {
             try {
                 authRepository.linkFirebaseUser(firebaseUid, displayName)
-                withTimeoutOrNull(SYNC_TIMEOUT) {
-                    if (syncService.hasRemoteProgress(firebaseUid)) {
-                        syncService.pullAllProgress(firebaseUid)
-                    } else {
-                        syncService.uploadAllLocalProgress(firebaseUid)
-                    }
-                    syncOwnedNonograms(firebaseUid)
-                    syncService.uploadAllLocalNonograms(firebaseUid)
-                    refreshPublishState(firebaseUid)
-                }
+                syncAllNow(fullOwned = true)
             } finally {
                 _signInComplete.value = true
             }
         }
     }
 
-    /** The whole remote pass, awaitable and bounded, so a caller can hold its own spinner around it. */
-    suspend fun syncAllNow() {
+    /**
+     * The whole remote pass, awaitable and bounded, so a caller can hold its own spinner around it.
+     * [fullOwned] ignores the owned cursor — sign-in, where guest-authored puzzles need pushing.
+     */
+    suspend fun syncAllNow(fullOwned: Boolean = false) {
         withTimeoutOrNull(SYNC_TIMEOUT) {
             syncService.syncPublicNonograms(authRepository, authRepository.currentFirebaseUid)
 
             val firebaseUid = authRepository.currentFirebaseUid.orMissing() ?: return@withTimeoutOrNull
             syncService.pullAndMergeAllProgress(firebaseUid)
-            syncOwnedNonograms(firebaseUid)
+            syncOwnedNonograms(firebaseUid, fullOwned)
             refreshPublishState(firebaseUid)
         }
     }
@@ -126,8 +120,8 @@ class AuthViewModel(
         _publishBanned.value = gate.banned
     }
 
-    private suspend fun syncOwnedNonograms(firebaseUid: String) {
-        val lastSyncedAt = authRepository.getLastOwnedNonogramSyncTimestamp(firebaseUid)
+    private suspend fun syncOwnedNonograms(firebaseUid: String, full: Boolean = false) {
+        val lastSyncedAt = if (full) 0L else authRepository.getLastOwnedNonogramSyncTimestamp(firebaseUid)
         _generatorSyncState.value = GeneratorSyncState.SYNCING
         try {
             val newestReceivedAt = syncService.pullOwnedNonograms(firebaseUid, lastSyncedAt)

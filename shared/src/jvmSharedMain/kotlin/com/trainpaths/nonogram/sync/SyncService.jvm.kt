@@ -56,17 +56,6 @@ class FirebaseJvmSyncService(private val sdk: AppSDK) : SyncService {
                 .set(mapOf(Fields.BOARD_STATE to boardState, Fields.UPDATED_AT to updatedAt))
         }
 
-    override suspend fun hasRemoteProgress(firebaseUid: String): Boolean =
-        logged("check remote failed", false) { fetchProgress(firebaseUid).isNotEmpty() }
-
-    override suspend fun uploadAllLocalProgress(firebaseUid: String) =
-        logged("upload all failed", Unit) { uploadAllProgress(sdk, firebaseUid) }
-
-    override suspend fun pullAllProgress(firebaseUid: String) =
-        logged("pull all failed", Unit) {
-            applyRemoteProgress(sdk, firebaseUid, fetchProgress(firebaseUid))
-        }
-
     override suspend fun pullAndMergeAllProgress(firebaseUid: String) =
         logged("pull and merge failed", Unit) {
             mergeRemoteProgress(sdk, firebaseUid, fetchProgress(firebaseUid))
@@ -86,13 +75,6 @@ class FirebaseJvmSyncService(private val sdk: AppSDK) : SyncService {
             nonogramsCollection().document(nonogram.id.toString()).set(fields, merge = true)
         }
 
-    override suspend fun uploadAllLocalNonograms(firebaseUid: String) =
-        logged("upload all nonograms failed", Unit) {
-            for (nonogram in sdk.getNonogramsByAuthor(firebaseUid)) {
-                pushNonogram(firebaseUid, nonogram)
-            }
-        }
-
     override suspend fun pullPublicNonogramsSince(firebaseUid: String?, since: Long): Long? =
         logged("pull public nonograms for puzzle list failed", null) {
             val documents = nonogramsCollection()
@@ -108,7 +90,7 @@ class FirebaseJvmSyncService(private val sdk: AppSDK) : SyncService {
                 .where { Fields.AUTHOR_UID equalTo firebaseUid }
                 .where { Fields.UPDATED_AT greaterThan since }
                 .get().documents
-            mergeRemoteNonograms(sdk, firebaseUid, since, parseNonograms(documents))
+            mergeRemoteNonograms(sdk, firebaseUid, since, parseNonograms(documents), pushLocalOnly = since == 0L)
         }
 
     override suspend fun requestPublish(firebaseUid: String, nonogram: Nonogram): Boolean =
