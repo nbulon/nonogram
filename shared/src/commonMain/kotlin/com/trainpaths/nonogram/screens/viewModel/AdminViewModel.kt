@@ -4,20 +4,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.trainpaths.nonogram.AppSDK
 import com.trainpaths.nonogram.auth.AuthRepository
 import com.trainpaths.nonogram.classes.Difficulty
 import com.trainpaths.nonogram.classes.Nonogram
+import com.trainpaths.nonogram.classes.PublishStatus
 import com.trainpaths.nonogram.classes.nameControl
 import com.trainpaths.nonogram.classes.normalizeNonogramName
 import com.trainpaths.nonogram.classes.sanitizeNameInput
 import com.trainpaths.nonogram.sync.SyncService
 import kotlinx.coroutines.CancellationException
+import kotlin.time.Clock
 
 private const val REVIEW_BATCH_SIZE = 20
 private const val SIGN_IN_REQUIRED_TO_REVIEW = "Sign in again to review requests."
 private val DEFAULT_REVIEW_DIFFICULTY = Difficulty.MEDIUM
 
 class AdminViewModel(
+    private val sdk: AppSDK,
     private val authRepository: AuthRepository,
     private val syncService: SyncService,
 ) : ViewModel() {
@@ -93,8 +97,13 @@ class AdminViewModel(
             error = problem
             return
         }
-        // The reviewer's name only lands with an approval; a denial hands the author's own back.
-        val nonogram = if (approve) pending.copy(name = normalizeNonogramName(name)) else pending
+        // The reviewer's name and difficulty only land with an approval; a denial keeps the author's.
+        val decided = pending.copy(
+            publishStatus = if (approve) PublishStatus.APPROVED else PublishStatus.DENIED,
+            difficulty = if (approve) selectedDifficulty else pending.difficulty,
+            name = if (approve) normalizeNonogramName(name) else pending.name,
+            updatedAt = Clock.System.now().toEpochMilliseconds(),
+        )
         isDeciding = true
         error = null
         launchGuarded {
@@ -102,12 +111,11 @@ class AdminViewModel(
                 val firebaseUid = authRepository.currentFirebaseUid
                     .orMissing { error = SIGN_IN_REQUIRED_TO_REVIEW } ?: return@launchGuarded
 
-                val decided =
-                    syncService.decideReview(firebaseUid, nonogram, approve, selectedDifficulty)
-                if (!decided) {
+                if (!syncService.decideReview(firebaseUid, decided, approve, selectedDifficulty)) {
                     error = "The decision could not be saved."
                     return@launchGuarded
                 }
+                if (sdk.getNonogramById(decided.id) != null) sdk.upsertNonogramFromRemote(decided)
                 queue = queue.drop(1)
                 resetReviewInputs()
                 if (queue.isEmpty()) refresh()

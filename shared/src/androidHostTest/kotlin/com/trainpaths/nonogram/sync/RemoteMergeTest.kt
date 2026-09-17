@@ -139,6 +139,44 @@ class RemoteMergeTest {
     }
 
     @Test
+    fun mergeRemoteNonograms_verdictWinsOverEqualTimestamps() = runTest {
+        sdk.upsertNonogramFromRemote(remote(42, updatedAt = 100, publishStatus = PublishStatus.PENDING))
+
+        service.mergeRemoteNonograms(
+            sdk, uid, 0, listOf(remote(42, updatedAt = 100, publishStatus = PublishStatus.APPROVED)),
+        )
+
+        assertEquals(PublishStatus.APPROVED, sdk.getNonogramById(42)?.publishStatus)
+        assertTrue(service.pushedNonograms.isEmpty())
+    }
+
+    @Test
+    fun mergeRemoteNonograms_verdictWinsOverNewerLocal() = runTest {
+        sdk.upsertNonogramFromRemote(remote(42, updatedAt = 200, publishStatus = PublishStatus.PENDING))
+
+        service.mergeRemoteNonograms(
+            sdk, uid, 0, listOf(remote(42, updatedAt = 150, publishStatus = PublishStatus.DENIED)),
+        )
+
+        val local = assertNotNull(sdk.getNonogramById(42))
+        assertEquals(PublishStatus.DENIED, local.publishStatus)
+        assertEquals(150, local.updatedAt)
+        assertTrue(service.pushedNonograms.isEmpty())
+    }
+
+    @Test
+    fun mergeRemoteNonograms_pendingOnBothSidesStillFollowsTimestamps() = runTest {
+        val local = remote(42, updatedAt = 300, publishStatus = PublishStatus.PENDING)
+        sdk.upsertNonogramFromRemote(local)
+
+        service.mergeRemoteNonograms(
+            sdk, uid, 0, listOf(remote(42, updatedAt = 200, publishStatus = PublishStatus.PENDING)),
+        )
+
+        assertEquals(listOf(local), service.pushedNonograms)
+    }
+
+    @Test
     fun mergeRemoteNonograms_deletedTombstoneRemovesLocalRow() = runTest {
         sdk.upsertNonogramFromRemote(remote(42, updatedAt = 100))
         sdk.saveProgressWithTimestamp(uid, 42, "[[1,0],[0,0]]", 100)

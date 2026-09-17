@@ -68,6 +68,7 @@ class AuthViewModel(
                     } else {
                         syncService.uploadAllLocalProgress(firebaseUid)
                     }
+                    syncOwnedNonograms(firebaseUid)
                     syncService.uploadAllLocalNonograms(firebaseUid)
                     refreshPublishState(firebaseUid)
                 }

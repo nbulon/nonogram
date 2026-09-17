@@ -186,6 +186,26 @@ class GenViewModel(
         }
     }
 
+    /**
+     * Adopts what a sync or an admin decision wrote to the saved row while the editor held its own
+     * copy — the review fields only, never the drawing. A staged [setPublic] flip leaves the row's
+     * stamp alone, so it survives.
+     */
+    fun reloadSaved() {
+        val id = nonogram.id
+        if (id == 0L || isSaving || isRequestingPublish) return
+        launchGuarded(onError = { println("Generator: reloading saved nonogram failed: ${it.message}") }) {
+            val saved = sdk.getNonogramById(id) ?: return@launchGuarded
+            if (saved.updatedAt <= nonogram.updatedAt || isSaving || isRequestingPublish) return@launchGuarded
+            nonogram = nonogram.copy(
+                publishStatus = saved.publishStatus,
+                difficulty = saved.difficulty,
+                name = saved.name,
+                updatedAt = saved.updatedAt,
+            )
+        }
+    }
+
     fun applyFilterSort(state: FilterSortState) {
         filterSort = state
     }

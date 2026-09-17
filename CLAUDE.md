@@ -171,7 +171,9 @@ initialize Koin DI and host the Compose UI.
   before the `currentFirebaseUid` gate, so guests pull public puzzles too — approved puzzles are readable
   unauthenticated (enforced by the Firestore rules), while progress, owned puzzles and the admin/moderation reads all
   need a session and stay behind the gate. `AdminViewModel` drives the admin review queue (one pending request at a
-  time, buffered a batch at a time). All depend on the suspend `AppSDK`/`SyncService` from inside
+  time, buffered a batch at a time); it stamps each decision's `updatedAt` itself and, when this device holds a copy
+  of the puzzle (the reviewer's own, or a pulled public one), writes the verdict onto that row too, so a
+  reviewer-author sees it without a sync. All depend on the suspend `AppSDK`/`SyncService` from inside
   `viewModelScope.launch` — but always via `launchGuarded` (`screens/viewModel/LaunchGuarded.kt`), never
   `viewModelScope.launch` directly: an uncaught throwable in a plain launch reaches the default handler and kills the
   process on Android. It rethrows `CancellationException` and routes everything else to `onError`; UI flags that gate a
@@ -191,7 +193,11 @@ initialize Koin DI and host the Compose UI.
   `MenuRoute` does **not** sync — it calls `MenuViewModel.reload()`, a silent local-DB re-read with no spinner, so
   puzzles just authored in the generator still appear. `MenuViewModel` therefore has two flags: `isLoading`
   (full-screen spinner, cold start and sign-in/sign-out only, via `reload(loadAll = true)`) and `isRefreshing` (the
-  pull-to-refresh indicator).
+  pull-to-refresh indicator). Entering `GeneratorRoute` or `GenConfRoute` calls `GenViewModel.reloadSaved()`, the
+  same idea for the puzzle in the editor: if the saved row's `updatedAt` moved on (a merge, or the admin's mirrored
+  verdict) it adopts the review fields — status, difficulty, name — and never the drawing. Opening the config screen
+  saves only when `canSave` (new or dirty): re-saving a clean puzzle re-stamps its `updatedAt`, which once left a
+  local `PENDING` copy and the remote `APPROVED` doc on the same timestamp, invisible to the merge.
 
   **Every remote pass is bounded.** `syncAllNow`, `retryOwnNonograms` and the post-sign-in sync wrap their work in
   `withTimeoutOrNull(SYNC_TIMEOUT)`, and the fire-and-forget `syncAll`/`retryOwnNonograms`/`signOut` release their
@@ -411,7 +417,10 @@ defined.
   uid suffix), since every user on the device — guests included — sees the same approved set.
   `pullPublicNonogramsSince` therefore takes a nullable uid: null is a guest's unauthenticated pull, and
   `mergeRemoteNonograms` (`sync/SyncService.kt`) then merges without ever pushing back. Merge policy is remote newer →
-  upsert; local newer & locally authored → push back. On both platforms — Android via
+  upsert; local newer & locally authored → push back; a verdict on a locally `PENDING` puzzle (remote no longer
+  `PENDING`) is taken whatever the timestamps say, since a pending copy holds nothing the remote lacks. The sign-in
+  pass pulls owned puzzles *before* `uploadAllLocalNonograms`, or the upload would stamp stale local copies over newer
+  docs. On both platforms — Android via
   `dev.gitlive:firebase-firestore` (androidMain), web via hand-written Firebase JS SDK externals (webMain), both
   isolated behind `sync/SyncService`; the web impl gates every call on `sessionMatches` *except* the public pull, which
   must work signed out. Security rules are **not** checked in — they are maintained per project in the Firebase console

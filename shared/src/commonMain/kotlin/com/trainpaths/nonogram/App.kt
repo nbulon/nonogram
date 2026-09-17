@@ -209,6 +209,9 @@ private fun AppContent(
                 composable<GenConfRoute> { entry ->
                     val route: GenConfRoute = entry.toRoute()
                     val isPublishBanned by authViewModel.publishBanned.collectAsState()
+                    LaunchedEffect(Unit) {
+                        genViewModel.reloadSaved()
+                    }
                     GenConfScreen(
                         genViewModel = genViewModel,
                         editing = route.editing,
@@ -243,10 +246,13 @@ private fun AppContent(
                     )
                 }
                 composable<GeneratorRoute> {
+                    LaunchedEffect(Unit) {
+                        genViewModel.reloadSaved()
+                    }
                     GenScreen(
                         genViewModel = genViewModel,
                         onConfig = {
-                            genViewModel.onSave()
+                            if (genViewModel.canSave) genViewModel.onSave()
                             navController.navigate(GenConfRoute(editing = true))
                         },
                         onExitToList = {
