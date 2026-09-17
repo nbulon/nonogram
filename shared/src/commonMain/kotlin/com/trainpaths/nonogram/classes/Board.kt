@@ -97,6 +97,7 @@ fun Board(
     // while the size does not, and re-fitting the view mid-drawing would snap the board around. Both
     // GenScreen takes the default; GameScreen hoists it so Check can fit the board as well as mark it.
     val currentTiles = rememberUpdatedState(tiles)
+    val currentIsLocked = rememberUpdatedState(isLocked)
     val currentIsEditable = rememberUpdatedState(isEditable)
     val currentDrawMode = rememberUpdatedState(drawMode)
     val currentOnTilesChanged = rememberUpdatedState(onTilesChanged)
@@ -136,10 +137,10 @@ fun Board(
                 .clipToBounds()
                 .boardGestures(
                     state = state,
-                    isLocked = isLocked,
+                    isLocked = { currentIsLocked.value },
                     tiles = { currentTiles.value },
                     isEditable = { currentIsEditable.value },
-                    drawMode = { currentDrawMode.value },
+                    drawMode = { start, secondary -> resolveDrawMode(currentDrawMode.value, start, secondary) },
                     onTilesChanged = { currentOnTilesChanged.value() },
                     onEdits = { currentOnEdits.value(it) },
                 ),
@@ -202,10 +203,10 @@ fun Board(
  */
 private fun Modifier.boardGestures(
     state: BoardTransformState,
-    isLocked: Boolean,
+    isLocked: () -> Boolean,
     tiles: () -> List<List<Tile>>,
     isEditable: () -> Boolean,
-    drawMode: () -> DrawMode,
+    drawMode: (start: TileState, secondary: Boolean) -> DrawMode,
     onTilesChanged: () -> Unit,
     onEdits: (List<TileEdit>) -> Unit,
 ): Modifier = this
@@ -228,13 +229,13 @@ private fun Modifier.boardGestures(
     }
     .pointerInput(state) {
         detectBoardTaps(
-            onTap = { position ->
+            onTap = { position, secondary ->
                 if (!isEditable()) return@detectBoardTaps
                 val hit = state.hitTest(position) ?: return@detectBoardTaps
                 val tile = tiles()
                     .getOrNull(hit.row)?.getOrNull(hit.col) ?: return@detectBoardTaps
                 val before = tile.state
-                tile.click(drawMode())
+                tile.click(drawMode(before, secondary))
                 if (tile.state != before) {
                     onEdits(
                         listOf(TileEdit(hit.row, hit.col, before = before, after = tile.state)),
@@ -259,19 +260,19 @@ private fun Modifier.boardGestures(
             state.applyTransformGesture(centroid, pan, zoom)
         }
     }
-    // Last means innermost on the Main pass. In locked mode this detector gets first
-    // refusal and consumes a committed one-pointer stroke before transform sees it.
-    .pointerInput(state, isLocked) {
-        if (isLocked) {
-            detectBoardDrawGestures(
-                state = state,
-                tiles = tiles,
-                isEditable = isEditable,
-                drawMode = drawMode,
-                onTilesChanged = onTilesChanged,
-                onEdits = onEdits,
-            )
-        }
+    // Last means innermost on the Main pass: this detector gets first refusal and consumes a
+    // committed stroke before transform sees it. The lock is read per gesture, not keyed on, so
+    // toggling it mid-session never restarts the detector.
+    .pointerInput(state) {
+        detectBoardDrawGestures(
+            state = state,
+            tiles = tiles,
+            isLocked = isLocked,
+            isEditable = isEditable,
+            drawMode = drawMode,
+            onTilesChanged = onTilesChanged,
+            onEdits = onEdits,
+        )
     }
 
 /**

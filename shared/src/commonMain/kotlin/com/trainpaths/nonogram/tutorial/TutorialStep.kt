@@ -1,5 +1,9 @@
 package com.trainpaths.nonogram.tutorial
 
+import com.trainpaths.nonogram.classes.BoardShortcut
+import com.trainpaths.nonogram.classes.BoardTrigger
+import com.trainpaths.nonogram.hasMouseAndKeyboard
+
 /**
  * One tutorial hint. Declaration order is priority order: when several steps are on screen at once,
  * the first unseen one in this list is shown, and dismissing it reveals the next. Within a screen
@@ -38,7 +42,8 @@ enum class TutorialStep(val title: String, val text: String) {
 
     BOARD_AREA(
         title = "The board",
-        text = "The numbers along the top and side are the clues. Drag across tiles to fill a run.",
+        text = "The numbers along the top and side are the clues." + keyHint(BoardShortcut.DRAW, BoardShortcut.ERASE) +
+                " Drag across tiles to draw a run.",
     ),
     BOARD_ZOOM(
         title = "Rezoom",
@@ -50,15 +55,17 @@ enum class TutorialStep(val title: String, val text: String) {
     ),
     BOARD_UNDO(
         title = "Undo and redo",
-        text = "Step back through your strokes. Saves up to 25 steps.",
+        text = "Step back through your strokes. Saves up to 25 steps." +
+                keyHint(BoardShortcut.UNDO, BoardShortcut.REDO),
     ),
     BOARD_LOCK(
         title = "Lock the board",
-        text = "Locked: dragging draws on the board. Unlocked: dragging pans the board.",
+        text = "Locked: dragging draws on the board. Unlocked: dragging pans the board." + keyHint(BoardShortcut.LOCK),
     ),
     BOARD_CHECK(
         title = "Check your work",
-        text = "Outlines every tile that contradicts the solution, and fits the board back on screen.",
+        text = "Outlines every tile that contradicts the solution, and fits the board back on screen." +
+                keyHint(BoardShortcut.CHECK),
     ),
 
     GENLIST_NEW(
@@ -109,7 +116,8 @@ enum class TutorialStep(val title: String, val text: String) {
     ),
     GEN_CHECK(
         title = "Check solvability",
-        text = "Outlines the cells the solver can't work out. Green means the puzzle is uniquely solvable.",
+        text = "Outlines the cells the solver can't work out. Green means the puzzle is uniquely solvable." +
+                keyHint(BoardShortcut.CHECK),
     ),
     GEN_WRENCH(
         title = "Puzzle settings",
@@ -122,3 +130,12 @@ enum class TutorialStep(val title: String, val text: String) {
  */
 fun nextStep(seen: Set<TutorialStep>, registered: Set<TutorialStep>): TutorialStep? =
     TutorialStep.entries.firstOrNull { it !in seen && it in registered }
+
+/** " Press D / F." for keys, " Left-click: toggle fill / cross, right-click: erase." for mouse buttons — only where a mouse and keyboard are the norm. */
+private fun keyHint(vararg shortcuts: BoardShortcut): String = when {
+    !hasMouseAndKeyboard -> ""
+    shortcuts.first().trigger is BoardTrigger.MouseButton ->
+        " " + shortcuts.joinToString(", ") { "${it.trigger.label}: ${it.label}".lowercase() }
+            .replaceFirstChar { it.uppercase() } + "."
+    else -> " Press " + shortcuts.joinToString(" / ") { it.trigger.label } + "."
+}

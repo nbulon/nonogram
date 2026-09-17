@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.trainpaths.nonogram.MAX_CONTENT_WIDTH
+import com.trainpaths.nonogram.hasMouseAndKeyboard
 import com.trainpaths.nonogram.classes.BoardHistory
 import com.trainpaths.nonogram.classes.DrawMode
 import com.trainpaths.nonogram.icons.lockClosed
@@ -82,35 +83,40 @@ fun BottomToolBar(
             contentColor = MaterialTheme.colorScheme.onSecondary,
             contentPadding = PaddingValues(horizontal = 4.dp),
         ) {
-            val iconOnlyCount = DrawMode.entries.size + (if (history != null) 2 else 0)
+            val showPencil = !hasMouseAndKeyboard
+            val iconOnlyCount = (if (showPencil) DrawMode.entries.size else 0) +
+                    (if (history != null) 2 else 0)
             val labelledCount = 1 + // lock
                     (if (onSave != null) 1 else 0) +
                     (if (onCheck != null) 1 else 0)
 
-            val groupCount = if (history != null) 3 else 2
+            val groupCount = 1 + (if (showPencil) 1 else 0) + (if (history != null) 1 else 0)
             val gapCount = groupCount - 1
 
             BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxHeight()) {
                 val forLabelled = maxWidth - MIN_GROUP_GAP * gapCount - ICON_ITEM_WIDTH * iconOnlyCount
                 val labelledWidth = (forLabelled / labelledCount).coerceAtMost(MAX_ITEM_WIDTH)
                 val used = ICON_ITEM_WIDTH * iconOnlyCount + labelledWidth * labelledCount
-                val groupGap = ((maxWidth - used) / gapCount).coerceIn(MIN_GROUP_GAP, MAX_GROUP_GAP)
+                val groupGap = if (gapCount == 0) 0.dp
+                else ((maxWidth - used) / gapCount).coerceIn(MIN_GROUP_GAP, MAX_GROUP_GAP)
 
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(groupGap, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ToolGroup(title = "Pencil", tutorialStep = TutorialStep.BOARD_DRAW_MODE) {
-                        DrawMode.entries.forEach { mode ->
-                            BottomBarItem(
-                                label = null,
-                                imageVector = mode.icon,
-                                contentDescription = "Draw mode: ${mode.label}",
-                                onClick = { onDrawModeSelect(mode) },
-                                width = ICON_ITEM_WIDTH,
-                                selected = drawMode == mode,
-                            )
+                    if (showPencil) {
+                        ToolGroup(title = "Pencil", tutorialStep = TutorialStep.BOARD_DRAW_MODE) {
+                            DrawMode.entries.forEach { mode ->
+                                BottomBarItem(
+                                    label = null,
+                                    imageVector = mode.icon,
+                                    contentDescription = "Draw mode: ${mode.label}",
+                                    onClick = { onDrawModeSelect(mode) },
+                                    width = ICON_ITEM_WIDTH,
+                                    selected = drawMode == mode,
+                                )
+                            }
                         }
                     }
 

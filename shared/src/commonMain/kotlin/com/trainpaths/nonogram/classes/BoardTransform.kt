@@ -1,14 +1,17 @@
 package com.trainpaths.nonogram.classes
 
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.changedToDown
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -485,12 +488,28 @@ class BoardTransformState {
     }
 }
 
-/** Detects locked-mode one-pointer drawing without interfering with taps or pinch zoom */
+/**
+ * `awaitFirstDown(requireUnconsumed = true)`, but handing back the event: the mouse button lives on
+ * [PointerEvent.buttons], which the change alone does not carry.
+ */
+private suspend fun AwaitPointerEventScope.awaitFirstDownEvent(): PointerEvent {
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Main)
+        if (event.changes.all { it.changedToDown() }) return event
+    }
+}
+
+/**
+ * Detects one-pointer drawing without interfering with taps or pinch zoom. A stroke commits only
+ * while locked or from the secondary mouse button — an unlocked primary drag is left to the
+ * transform detector to pan.
+ */
 internal suspend fun PointerInputScope.detectBoardDrawGestures(
     state: BoardTransformState,
     tiles: () -> List<List<Tile>>,
+    isLocked: () -> Boolean,
     isEditable: () -> Boolean,
-    drawMode: () -> DrawMode,
+    drawMode: (start: TileState, secondary: Boolean) -> DrawMode,
     onTilesChanged: () -> Unit,
     onEdits: (List<TileEdit>) -> Unit = {},
 ) {
@@ -498,7 +517,11 @@ internal suspend fun PointerInputScope.detectBoardDrawGestures(
 
     awaitPointerEventScope {
         while (true) {
-            val down = awaitFirstDown(requireUnconsumed = true, pass = PointerEventPass.Main)
+            val downEvent = awaitFirstDownEvent()
+            val down = downEvent.changes.first()
+            val secondary = downEvent.buttons.isSecondaryPressed
+            if (!isLocked() && !secondary) continue
+
             var previousPosition = down.position
             var committed = false
             var surrenderedToPinch = false
@@ -517,8 +540,11 @@ internal suspend fun PointerInputScope.detectBoardDrawGestures(
                 ) {
                     committed = true
                     if (isEditable()) {
+                        val board = tiles()
                         stroke = state.hitTest(down.position)?.let { start ->
-                            TileStroke.begin(tiles(), start, drawMode())
+                            val startState = board.getOrNull(start.row)?.getOrNull(start.col)?.state
+                                ?: return@let null
+                            TileStroke.begin(board, start, drawMode(startState, secondary))
                         }
                     }
                 }
@@ -555,16 +581,19 @@ internal suspend fun PointerInputScope.detectBoardDrawGestures(
  *
  * Never consumes, so a sibling `detectTransformGestures` is unaffected. Cancels its pending tap
  * whenever that detector consumes — i.e. once the drag passes touch slop — which is what makes
- * "drag pans, tap toggles" work with no explicit threshold of our own.
+ * "drag pans, tap toggles" work with no explicit threshold of our own. Reports which mouse button
+ * went down, read at the down since the up no longer holds it.
  */
 suspend fun PointerInputScope.detectBoardTaps(
-    onTap: (Offset) -> Unit,
+    onTap: (position: Offset, secondary: Boolean) -> Unit,
 ) {
     val slop = viewConfiguration.touchSlop
 
     awaitPointerEventScope {
         while (true) {
-            val down = awaitFirstDown(requireUnconsumed = true, pass = PointerEventPass.Main)
+            val downEvent = awaitFirstDownEvent()
+            val down = downEvent.changes.first()
+            val secondary = downEvent.buttons.isSecondaryPressed
             var cancelled = false
             var up: PointerInputChange? = null
 
@@ -585,7 +614,7 @@ suspend fun PointerInputScope.detectBoardTaps(
             }
 
             val u = up
-            if (!cancelled && u != null) onTap(u.position)
+            if (!cancelled && u != null) onTap(u.position, secondary)
         }
     }
 }

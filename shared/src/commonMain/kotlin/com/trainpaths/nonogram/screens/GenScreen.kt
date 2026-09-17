@@ -20,6 +20,7 @@ import com.trainpaths.nonogram.navigation.TopAppBar
 import com.trainpaths.nonogram.classes.Board
 import com.trainpaths.nonogram.classes.BoardTransformState
 import com.trainpaths.nonogram.classes.DrawMode
+import com.trainpaths.nonogram.classes.boardShortcuts
 import com.trainpaths.nonogram.dialogs.GenSaveConfirmDialog
 import com.trainpaths.nonogram.dialogs.PublicEditConfirmDialog
 import com.trainpaths.nonogram.screens.viewModel.GenViewModel
@@ -55,7 +56,22 @@ fun GenScreen(
     val backState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
     NavigationBackHandler(state = backState) { attemptLeave() }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    val onLockToggle = { isLocked = !isLocked }
+    val checkEnabled = !genViewModel.isSaving && genViewModel.validationState != ValidationState.CHECKING
+    val onCheck = {
+        genViewModel.checkBoard()
+        boardState.reset()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .boardShortcuts(
+                onLockToggle = onLockToggle,
+                onCheck = if (checkEnabled) onCheck else null,
+                history = genViewModel.history,
+            ),
+    ) {
         TopAppBar(
             onBack = { if (!genViewModel.isSaving) requestSave { onConfig() } },
             showSettings = true,
@@ -83,18 +99,14 @@ fun GenScreen(
 
         BottomToolBar(
             isLocked = isLocked,
-            onLockToggle = { isLocked = !isLocked },
+            onLockToggle = onLockToggle,
             drawMode = drawMode,
             onDrawModeSelect = { drawMode = it },
             history = genViewModel.history,
             saveEnabled = genViewModel.canSave,
             onSave = { requestSave { genViewModel.onSave() } },
-            onCheck = {
-                genViewModel.checkBoard()
-                boardState.reset()
-            },
-            checkEnabled = !genViewModel.isSaving &&
-                    genViewModel.validationState != ValidationState.CHECKING,
+            onCheck = onCheck,
+            checkEnabled = checkEnabled,
             checkTint = when (genViewModel.validationState) {
                 ValidationState.VALID -> MaterialTheme.colorScheme.onTertiary
                 ValidationState.INVALID -> MaterialTheme.colorScheme.tertiaryFixed
