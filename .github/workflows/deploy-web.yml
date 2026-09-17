@@ -33,16 +33,25 @@ jobs:
         with:
           cache-disabled: true
 
-      # Overrides gradle.properties, so build stays a single low-priority JVM
-      - name: Build web distributions (prod)
+      # Two invocations so the compile JVM is gone before the native wasm-opt runs beside it
+      - name: Compile wasmJs (prod)
+        run: |
+          echo 1000 > /proc/self/oom_score_adj
+          ./gradlew :webApp:compileProductionExecutableKotlinWasmJs \
+            -Pnonogram.env=prod \
+            --no-daemon --no-parallel --max-workers=1 \
+            -Dorg.gradle.jvmargs="-Xmx1380m -XX:MaxMetaspaceSize=300m -XX:ReservedCodeCacheSize=128m -XX:+UseSerialGC -XX:MaxHeapFreeRatio=20 -XX:MinHeapFreeRatio=10 -Dfile.encoding=UTF-8" \
+            -Pkotlin.compiler.execution.strategy=in-process
+
+      - name: Optimize and bundle wasmJs distribution (prod)
         env:
           NODE_OPTIONS: --max-old-space-size=580
         run: |
-          nice -n 15 ./gradlew :webApp:wasmJsBrowserDistribution \
+          echo 1000 > /proc/self/oom_score_adj
+          ./gradlew :webApp:wasmJsBrowserDistribution \
             -Pnonogram.env=prod \
             --no-daemon --no-parallel --max-workers=1 \
-            -Dorg.gradle.jvmargs="-Xmx1380m -XX:MaxMetaspaceSize=370m -XX:+UseSerialGC -XX:MaxHeapFreeRatio=20 -XX:MinHeapFreeRatio=10 -Dfile.encoding=UTF-8" \
-            -Pkotlin.compiler.execution.strategy=in-process
+            -Dorg.gradle.jvmargs="-Xmx640m -XX:MaxMetaspaceSize=256m -XX:+UseSerialGC -Dfile.encoding=UTF-8"
 
       - name: Build image on the host and restart the container
         env:
