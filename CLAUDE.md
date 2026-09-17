@@ -114,9 +114,8 @@ initialize Koin DI and host the Compose UI.
   **The platform services are adapters, not logic.** Anything two implementations would otherwise write twice lives in
   commonMain beside `SyncService`, because every duplicated piece had already drifted once: `FirestoreSchema.kt`
   (`Paths` / `Fields` — every collection path and field name, mirrored a second time by the web externals' property
-  names and a third by the console-managed Firestore rules), `RemoteProgress.kt` (`mergeRemoteProgress` /
-  `applyRemoteProgress` /
-  `uploadAllProgress`, the mirror of `mergeRemoteNonograms`) and `NonogramDocument.kt` (the wire document plus
+  names and a third by the console-managed Firestore rules), `RemoteProgress.kt` (`mergeRemoteProgress`, the mirror of
+  `mergeRemoteNonograms`) and `NonogramDocument.kt` (the wire document plus
   `toNonogram(onSkip)` — decoding, `isWellFormedGrid`, and the enum fallbacks that let an older writer's document read
   on a newer client; `encodeSolution` is the write side). A platform contributes a fetch (`fetchProgress`,
   `parseNonograms` + its snapshot → `NonogramDocument` adapter), the document writes, and its error handling:
@@ -186,8 +185,8 @@ initialize Koin DI and host the Compose UI.
   `publishError`, `AdminViewModel.error`). The two uid sources are not the same condition — a null
   `currentUserUid` is an anomaly (auth not initialized), a null `currentFirebaseUid` is just a guest.
 
-  **When sync runs.** `syncAll` fires once from `AppContent`'s app-start `LaunchedEffect`, and after that only when the
-  user pull-to-refreshes the menu (`MenuScreen`'s `PullToRefreshBox` → `MenuViewModel.refresh(sync)`, which takes the
+  **When sync runs.** `syncAll` fires once from `AppContent`'s app-start `LaunchedEffect`, once more inside a sign-in
+  (see **Firebase / Auth**), and after that only when the user pull-to-refreshes the menu (`MenuScreen`'s `PullToRefreshBox` → `MenuViewModel.refresh(sync)`, which takes the
   pass itself as a suspend lambda — `authViewModel::syncAllNow` — so `isRefreshing` is set and cleared inside one
   coroutine; a callback from another ViewModel that never arrived used to leave it spinning forever). Entering
   `MenuRoute` does **not** sync — it calls `MenuViewModel.reload()`, a silent local-DB re-read with no spinner, so
@@ -199,7 +198,7 @@ initialize Koin DI and host the Compose UI.
   saves only when `canSave` (new or dirty): re-saving a clean puzzle re-stamps its `updatedAt`, which once left a
   local `PENDING` copy and the remote `APPROVED` doc on the same timestamp, invisible to the merge.
 
-  **Every remote pass is bounded.** `syncAllNow`, `retryOwnNonograms` and the post-sign-in sync wrap their work in
+  **Every remote pass is bounded.** `syncAllNow` and `retryOwnNonograms` wrap their work in
   `withTimeoutOrNull(SYNC_TIMEOUT)`, and the fire-and-forget `syncAll`/`retryOwnNonograms`/`signOut` release their
   `onComplete` under `NonCancellable + Dispatchers.Main`. Both exist because a Firestore promise on web can neither be
   cancelled nor relied on to settle — see `docs/web-architecture.md → One thread, and what that costs`. The two sync
@@ -418,9 +417,12 @@ defined.
   `pullPublicNonogramsSince` therefore takes a nullable uid: null is a guest's unauthenticated pull, and
   `mergeRemoteNonograms` (`sync/SyncService.kt`) then merges without ever pushing back. Merge policy is remote newer →
   upsert; local newer & locally authored → push back; a verdict on a locally `PENDING` puzzle (remote no longer
-  `PENDING`) is taken whatever the timestamps say, since a pending copy holds nothing the remote lacks. The sign-in
-  pass pulls owned puzzles *before* `uploadAllLocalNonograms`, or the upload would stamp stale local copies over newer
-  docs. On both platforms — Android via
+  `PENDING`) is taken whatever the timestamps say, since a pending copy holds nothing the remote lacks. Both merges
+  also push rows the remote has never seen: `mergeRemoteProgress` always (the progress fetch is the whole
+  collection), `mergeRemoteNonograms` only on a full owned pull (`pushLocalOnly`, passed as `since == 0`). That is
+  what makes **sign-in a single ordinary pass**: `onFirebaseSignInSuccess` is `linkFirebaseUser` +
+  `syncAllNow(fullOwned = true)` — the owned cursor survives sign-out, so it is ignored once to reach guest-authored
+  puzzles the link just moved onto the uid — and the screens do not sync again on `signInComplete`. On both platforms — Android via
   `dev.gitlive:firebase-firestore` (androidMain), web via hand-written Firebase JS SDK externals (webMain), both
   isolated behind `sync/SyncService`; the web impl gates every call on `sessionMatches` *except* the public pull, which
   must work signed out. Security rules are **not** checked in — they are maintained per project in the Firebase console
