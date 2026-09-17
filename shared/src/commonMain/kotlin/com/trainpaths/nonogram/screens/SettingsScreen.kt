@@ -40,7 +40,9 @@ import com.trainpaths.nonogram.AppButton
 import com.trainpaths.nonogram.ColorTheme
 import com.trainpaths.nonogram.switchColors
 import com.trainpaths.nonogram.darken
+import com.trainpaths.nonogram.dialogs.KeybindsDialog
 import com.trainpaths.nonogram.dialogs.SignOutConfirmDialog
+import com.trainpaths.nonogram.hasMouseAndKeyboard
 import com.trainpaths.nonogram.icons.settings
 import com.trainpaths.nonogram.navigation.TopAppBar
 import com.trainpaths.nonogram.screens.viewModel.AuthViewModel
@@ -67,6 +69,7 @@ fun SettingsScreen(
     val signInComplete by authViewModel.signInComplete.collectAsState()
 
     var showSignOutDialog by remember { mutableStateOf(false) }
+    var showKeybinds by remember { mutableStateOf(false) }
     var isSigningIn by remember { mutableStateOf(false) }
 
     LaunchedEffect(signInComplete) {
@@ -87,7 +90,7 @@ fun SettingsScreen(
         )
         Column(
             modifier = Modifier.fillMaxHeight().width(310.dp).padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(30.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth().tutorialAnchor(TutorialStep.SETTINGS_THEME),
@@ -127,6 +130,13 @@ fun SettingsScreen(
                 )
             }
             SettingsDivider()
+            if (hasMouseAndKeyboard) {
+                AppButton(
+                    text = "Keybinds",
+                    onClick = { showKeybinds = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             AppButton(
                 text = "Show tips again",
                 onClick = { tutorialRepository.resetAll() },
@@ -177,6 +187,10 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+
+    if (showKeybinds) {
+        KeybindsDialog(onClose = { showKeybinds = false })
     }
 
     if (showSignOutDialog) {

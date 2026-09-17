@@ -250,7 +250,12 @@ the drawing and history groups use ("Pencil", "History"), since their buttons ar
 separate actions. The board group passes no title, so each of its buttons labels itself. Both shapes come out the same
 height (pill + one text line), which is what keeps every icon on one line.
 
-Both screens render 7 buttons, which does not fit a phone at a fixed width, so `BoxWithConstraints` sizes them: the
+On mouse platforms (`hasMouseAndKeyboard`, `PlatformInput.kt` — desktop and web) the drawing group is hidden: the mouse
+button is the pencil (left toggles fill/cross, right erases) and `A`/`S`/`D`/`F` drive lock, check, undo and redo via
+`Modifier.boardShortcuts` (`classes/BoardShortcuts.kt`, whose `BoardShortcut` table lists the mouse buttons too and
+feeds Settings' "Keybinds" dialog and the tutorial hints). See `docs/board-rendering.md → Mouse and keyboard`.
+
+On touch, both screens render 7 buttons, which does not fit a phone at a fixed width, so `BoxWithConstraints` sizes them: the
 icon-only buttons take a fixed `ICON_ITEM_WIDTH`, the labelled ones split what is left and ellipsize rather than
 overflow, and the group gap absorbs the remainder (clamped, with the row centred) — **the gaps are subtracted before the
 items are sized**, because handing the items the full width leaves the arrangement no slack and the grouping silently

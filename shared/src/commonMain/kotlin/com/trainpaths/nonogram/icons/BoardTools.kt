@@ -158,24 +158,30 @@ val tileCross: ImageVector
         if (_tileCross != null) return _tileCross!!
         _tileCross = toolIcon("tile_cross", fillType = PathFillType.EvenOdd) {
             squareOutline()
-            // One traced X outline, not two crossed bars: under even-odd two overlapping bars would
-            // cancel where they meet and punch a hole through the middle of the cross. Sits inside
-            // the ring's hole, so even-odd never subtracts it either.
-            moveTo(17f, 8f)
-            lineTo(16f, 7f)
-            lineTo(12f, 11f)
-            lineTo(8f, 7f)
-            lineTo(7f, 8f)
-            lineTo(11f, 12f)
-            lineTo(7f, 16f)
-            lineTo(8f, 17f)
-            lineTo(12f, 13f)
-            lineTo(16f, 17f)
-            lineTo(17f, 16f)
-            lineTo(13f, 12f)
-            close()
+            tracedCross(cx = 12f, cy = 12f, reach = 5f, halfWidth = 1f)
         }
         return _tileCross!!
+    }
+
+/** Two overlapping tiles — a filled one behind, top-right, a crossed one in front, bottom-left. */
+@Suppress("CheckReturnValue")
+val tileToggle: ImageVector
+    get() {
+        if (_tileToggle != null) return _tileToggle!!
+        _tileToggle = toolIcon("tile_toggle", fillType = PathFillType.EvenOdd) {
+            // The filled tile (8,2)-(22,16) minus the front tile plus a one-unit gap, drawn as the
+            // remaining L so nothing overlaps the ring under even-odd.
+            moveTo(8f, 2f)
+            horizontalLineTo(22f)
+            verticalLineTo(16f)
+            horizontalLineTo(17f)
+            verticalLineTo(7f)
+            horizontalLineTo(8f)
+            close()
+            squareOutline(left = 2f, top = 8f, size = 14f, thickness = 1.5f)
+            tracedCross(cx = 9f, cy = 15f, reach = 3.5f, halfWidth = 1.25f)
+        }
+        return _tileToggle!!
     }
 
 @Suppress("CheckReturnValue")
@@ -262,21 +268,41 @@ private inline fun toolIcon(
     }.build()
 
 @Suppress("CheckReturnValue")
-private fun PathBuilder.squareOutline(inset: Float = 3f, thickness: Float = 2f) {
-    val outer = 24f - inset
-    val innerStart = inset + thickness
-    val innerEnd = outer - thickness
-
-    moveTo(inset, inset)
-    horizontalLineTo(outer)
-    verticalLineTo(outer)
-    horizontalLineTo(inset)
+private fun PathBuilder.squareOutline(left: Float = 3f, top: Float = 3f, size: Float = 18f, thickness: Float = 2f) {
+    moveTo(left, top)
+    horizontalLineTo(left + size)
+    verticalLineTo(top + size)
+    horizontalLineTo(left)
     close()
 
-    moveTo(innerStart, innerStart)
-    horizontalLineTo(innerEnd)
-    verticalLineTo(innerEnd)
-    horizontalLineTo(innerStart)
+    moveTo(left + thickness, top + thickness)
+    horizontalLineTo(left + size - thickness)
+    verticalLineTo(top + size - thickness)
+    horizontalLineTo(left + thickness)
+    close()
+}
+
+/**
+ * One traced X outline, not two crossed bars: under even-odd two overlapping bars would cancel where
+ * they meet and punch a hole through the middle of the cross. Drawn inside a [squareOutline]'s hole,
+ * so even-odd never subtracts it either.
+ */
+@Suppress("CheckReturnValue")
+private fun PathBuilder.tracedCross(cx: Float, cy: Float, reach: Float, halfWidth: Float) {
+    val r = reach
+    val w = halfWidth
+    moveTo(cx + r, cy - r + w)
+    lineTo(cx + r - w, cy - r)
+    lineTo(cx, cy - w)
+    lineTo(cx - r + w, cy - r)
+    lineTo(cx - r, cy - r + w)
+    lineTo(cx - w, cy)
+    lineTo(cx - r, cy + r - w)
+    lineTo(cx - r + w, cy + r)
+    lineTo(cx, cy + w)
+    lineTo(cx + r - w, cy + r)
+    lineTo(cx + r, cy + r - w)
+    lineTo(cx + w, cy)
     close()
 }
 
@@ -286,6 +312,7 @@ private var _lockOpen: ImageVector? = null
 private var _save: ImageVector? = null
 private var _tileFill: ImageVector? = null
 private var _tileCross: ImageVector? = null
+private var _tileToggle: ImageVector? = null
 private var _tileErase: ImageVector? = null
 private var _expand_content: ImageVector? = null
 

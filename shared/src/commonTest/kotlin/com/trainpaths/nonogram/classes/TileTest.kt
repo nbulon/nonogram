@@ -47,6 +47,33 @@ class TileTest {
     }
 
     @Test
+    fun mouseDrawMode_primaryTogglesFillAndCross() {
+        assertEquals(DrawMode.FILL, mouseDrawMode(TileState.NONE, secondary = false))
+        assertEquals(DrawMode.CROSS, mouseDrawMode(TileState.FILLED, secondary = false))
+        assertEquals(DrawMode.FILL, mouseDrawMode(TileState.CROSSED, secondary = false))
+    }
+
+    @Test
+    fun mouseDrawMode_secondaryAlwaysErases() {
+        for (start in TileState.entries) {
+            assertEquals(DrawMode.ERASE, mouseDrawMode(start, secondary = true), "$start")
+        }
+    }
+
+    @Test
+    fun boardShortcuts_useDistinctTriggers() {
+        assertEquals(BoardShortcut.entries.size, BoardShortcut.entries.map { it.trigger }.toSet().size)
+    }
+
+    @Test
+    fun boardShortcuts_coverBothMouseButtons() {
+        assertEquals(
+            BoardTrigger.MouseButton.entries.toSet(),
+            BoardShortcut.entries.map { it.trigger }.filterIsInstance<BoardTrigger.MouseButton>().toSet(),
+        )
+    }
+
+    @Test
     fun toSolutionInts_countsOnlyFilled() {
         assertEquals(
             listOf(listOf(1, 0, 0), listOf(0, 1, 0)),

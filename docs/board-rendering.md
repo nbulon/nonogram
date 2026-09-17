@@ -96,30 +96,67 @@ Four stacked `pointerInput` nodes on the gesture Box. Compose dispatches the **M
 1. **Scroll-wheel zoom** (Main) — desktop/web; clamps notches so one flick isn't a 100× zoom.
 2. **`detectBoardTaps`** — fires `onTap` immediately on UP (no double-tap delay, so tapping a tile isn't laggy). Never
    consumes; **cancels itself** the moment another detector consumes (i.e. once a drag passes touch slop). That
-   self-cancel *is* the "tap toggles vs drag pans" threshold — there is no explicit distance check of our own.
+   self-cancel *is* the "tap toggles vs drag pans" threshold — there is no explicit distance check of our own. It
+   reports which mouse button went down alongside the position (see "Mouse and keyboard").
 3. **End-of-gesture reset** (Final pass) — when no pointer is down, `endGesture()` so the next drag re-picks its region.
 4. **`detectTransformGestures`** — pan/zoom. A one-finger drag starting in a gutter scrolls *that gutter* on its own
    axis and pans the board on the other; a pinch always transforms the board and pins the rest of the gesture to that
    (`activeRegion`).
-5. **`detectBoardDrawGestures`** (only when `isLocked`) — innermost, so in locked mode it gets first refusal. Commits a
-   one-pointer stroke only after touch slop (a second finger before that hands off to pinch); once committed it consumes
-   every change so the transform detector can't also pan.
+5. **`detectBoardDrawGestures`** — innermost, so it gets first refusal. It takes a gesture only while
+   `isLocked() || secondary` (a right-button drag always erases, see below) and otherwise skips to the next down so
+   the transform detector pans. Commits a one-pointer stroke only after touch slop (a second finger before that hands
+   off to pinch); once committed it consumes every change so the transform detector can't also pan.
    `TileStroke` fixes its target state once from the mode (`mode.target`) and visits each cell at
    most once, so crossing back over a stroke doesn't re-toggle.
 
-**Lock mode** (`isLocked`): `true` → one-finger drag *draws*; `false` → one-finger drag *pans*. Pinch zoom and
-tap-to-edit work in both. Toggled from `BottomToolBar` (the lock/unlock button).
+Both detectors get their first down from `awaitFirstDownEvent`, a copy of `awaitFirstDown(requireUnconsumed = true)`
+that returns the `PointerEvent` — the mouse button lives on `event.buttons`, which the change alone does not carry, and
+it has to be read at the down because the up no longer holds it.
 
-**Draw mode** (`DrawMode`, picked from the `BottomToolBar`'s drawing group): what an edit *writes*. `FILL` / `CROSS` /
-`ERASE` each write that one state and are idempotent, so re-tapping or re-crossing a cell never undoes it — clearing a
-cell means selecting `ERASE`. There is no toggle/cycle mode: the earlier `TOGGLE`, which advanced the cell by
-`TileState.next()`, was removed along with `TileState.next()` itself. Both mutation
-paths — the tap in `Board` and `TileStroke.begin` — resolve through
-`DrawMode.target`, which is the single answer to "what does this edit write?" — and it is a plain constant per mode, so
-no edit anywhere reads the cell's existing state. The mode reaches the long-lived
-gesture coroutines as a lambda (`drawMode: () -> DrawMode`) read at stroke commit, and is *not* a `pointerInput` key:
-changing tools mid-board must not tear down and restart the detectors. It is per-screen composable state, like
-`isLocked`, and resets to `FILL`.
+**Lock mode** (`isLocked`): `true` → one-finger (left-button) drag *draws*; `false` → it *pans*. Pinch zoom and
+tap-to-edit work in both. Toggled from `BottomToolBar` (the lock/unlock button) or the `A` key. `Board` reads it
+through a lambda like every other callback, not as a `pointerInput` key, so toggling it mid-session never restarts
+the detector.
+
+**Draw mode** (`DrawMode`, picked from the `BottomToolBar`'s drawing group on touch platforms): what an edit *writes*.
+`FILL` / `CROSS` / `ERASE` each write that one state and are idempotent, so re-tapping or re-crossing a cell never
+undoes it — clearing a cell means selecting `ERASE`. There is no toggle/cycle mode: the earlier `TOGGLE`, which
+advanced the cell by `TileState.next()`, was removed along with `TileState.next()` itself. Both mutation paths — the
+tap in `Board` and `TileStroke.begin` — resolve through `DrawMode.target`, which is the single answer to "what does
+this edit write?" — and it is a plain constant per mode, so `Tile.click` and `TileStroke` never read the cell's
+existing state. The one place that does is `resolveDrawMode` (`Tile.kt`), run *before* either: on touch platforms it
+returns the pencil unchanged, on mouse platforms it derives the mode from the button and the tile the gesture
+started on (`mouseDrawMode`, see "Mouse and keyboard"). The pencil reaches the long-lived gesture coroutines through a
+lambda (`drawMode: (start, secondary) -> DrawMode`) read at stroke commit, and is *not* a `pointerInput` key: changing
+tools mid-board must not tear down and restart the detectors. It is per-screen composable state, like `isLocked`, and
+resets to `FILL`.
+
+## Mouse and keyboard
+
+`hasMouseAndKeyboard` (`PlatformInput.kt`, an `expect val`: `true` on desktop and web, `false` on Android — the two
+JVM actuals are separate files because `jvmSharedMain` serves both) switches the board to controls that need a
+mouse:
+
+- **The button is the pencil.** `mouseDrawMode(start, secondary)`: the secondary button erases, the primary toggles
+  FILLED ↔ CROSSED and fills an empty tile. A stroke still fixes its target once from the tile it started on, so a
+  left-drag from an empty cell fills the whole run and from a filled cell crosses it. A right-drag erases whether the
+  board is locked or not — right has no panning use, so only the left button obeys the lock. On web,
+  `suppressContextMenu()` (`PlatformInput.web.kt`, called from `webApp`'s `main`) keeps the browser menu off the canvas.
+- **The pencil group is hidden.** `BottomToolBar` drops the "Pencil" `ToolGroup` and its counts adjust (one fewer
+  group and gap). `TutorialStep.BOARD_DRAW_MODE` needs no special case: with no anchor registered the controller
+  skips it.
+- **Settings → "Keybinds"** opens `dialogs/KeybindsDialog.kt`, one row per `BoardShortcut` — the `icons/Mouse.kt`
+  vector or a key cap, then what it does.
+
+**Keys** are not gated: `Modifier.boardShortcuts` (`classes/BoardShortcuts.kt`) works with any keyboard. `BoardShortcut`
+is the single table for mouse buttons and keys alike — each entry's `BoardTrigger` is a `MouseButton` (primary
+draws, secondary erases) or a `KeyPress` (`A` lock/unlock, `S` check, `D` undo, `F` redo) — read by the handler, the
+dialog and the tutorial copy (`keyHint`, which formats a key or a mouse row). The mouse rows only *describe* the bindings; the gesture layer
+reads the button itself (`mouseDrawMode`). The modifier goes on each screen's root `Column`, requests focus on entry, and handles plain
+`KeyDown` events (any Ctrl/Alt/Meta chord falls through). Key events bubble from the focused node up through its
+ancestors, so a bottom-bar button that took focus on a click does not swallow them; a dialog is its own focus root,
+so they stay dead while one is open. `history.undo()`/`redo()` are already no-ops on empty stacks; the screen passes
+`onCheck = null` while its Check button is disabled.
 
 ## The check mark
 
@@ -186,7 +223,7 @@ it deliberately does not read `state.scale`, which would redraw every clue line 
 
 ## Edit history (undo/redo)
 
-`BoardHistory` (`classes/BoardHistory.kt`) is a capped (10-step) undo/redo journal, one instance owned by each of
+`BoardHistory` (`classes/BoardHistory.kt`) is a capped (25-step) undo/redo journal, one instance owned by each of
 `GameViewModel` and `GenViewModel`. A "move" is one drag stroke or one tap, recorded as a single `List<TileEdit>` so one
 undo reverses the whole gesture, not one cell at a time. Undo/redo write `TileState` back into the *existing* `Tile`
 objects (never replace the

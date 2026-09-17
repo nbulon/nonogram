@@ -3,6 +3,7 @@ package com.trainpaths.nonogram.classes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.trainpaths.nonogram.hasMouseAndKeyboard
 
 enum class TileState {
     NONE,
@@ -23,6 +24,21 @@ enum class DrawMode {
             ERASE -> TileState.NONE
         }
 }
+
+/**
+ * A mouse edit carries its mode in the button: secondary erases, primary toggles fill/cross off the
+ * tile it started on. The one edit path that reads a tile's existing state — resolved *before*
+ * [DrawMode.target], so a stroke still fixes its target once.
+ */
+fun mouseDrawMode(start: TileState, secondary: Boolean): DrawMode = when {
+    secondary -> DrawMode.ERASE
+    start == TileState.FILLED -> DrawMode.CROSS
+    else -> DrawMode.FILL
+}
+
+/** The one answer to "what does this edit write?": the pencil on touch platforms, the mouse button elsewhere. */
+fun resolveDrawMode(pencil: DrawMode, start: TileState, secondary: Boolean): DrawMode =
+    if (hasMouseAndKeyboard) mouseDrawMode(start, secondary) else pencil
 
 class Tile {
     private var _state by mutableStateOf(TileState.NONE)

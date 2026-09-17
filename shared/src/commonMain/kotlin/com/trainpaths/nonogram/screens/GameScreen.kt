@@ -20,6 +20,7 @@ import com.trainpaths.nonogram.screens.viewModel.GameViewModel
 import com.trainpaths.nonogram.classes.Board
 import com.trainpaths.nonogram.classes.BoardTransformState
 import com.trainpaths.nonogram.classes.DrawMode
+import com.trainpaths.nonogram.classes.boardShortcuts
 import com.trainpaths.nonogram.classes.toSolutionInts
 import com.trainpaths.nonogram.tutorial.TutorialStep
 import com.trainpaths.nonogram.tutorial.tutorialAnchor
@@ -38,8 +39,17 @@ fun GameScreen(
     val tiles = viewModel.tiles
     // Hoisted so Check can fit the board again alongside marking mistakes.
     val boardState = remember(nonogram?.width, nonogram?.height) { BoardTransformState() }
+    val onLockToggle = { isLocked = !isLocked }
+    val onCheck = {
+        viewModel.checkBoard()
+        boardState.reset()
+    }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .boardShortcuts(onLockToggle = onLockToggle, onCheck = onCheck, history = viewModel.history),
+    ) {
         TopAppBar(
             onBack = onBack,
             showSettings = true,
@@ -73,14 +83,11 @@ fun GameScreen(
 
         BottomToolBar(
             isLocked = isLocked,
-            onLockToggle = { isLocked = !isLocked },
+            onLockToggle = onLockToggle,
             drawMode = drawMode,
             onDrawModeSelect = { drawMode = it },
             history = viewModel.history,
-            onCheck = {
-                viewModel.checkBoard()
-                boardState.reset()
-            },
+            onCheck = onCheck,
             checkTutorialStep = TutorialStep.BOARD_CHECK,
         )
     }

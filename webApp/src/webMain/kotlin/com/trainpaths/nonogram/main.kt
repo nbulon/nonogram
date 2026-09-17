@@ -37,6 +37,7 @@ fun main() {
         AppInitializer.initializeApp(koin.get<AppSDK>(), koin.get<AuthRepository>())
     }
 
+    suppressContextMenu()
     ComposeViewport {
         App(
             menuViewModelFactory = { koinViewModel<MenuViewModel>() },
