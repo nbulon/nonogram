@@ -128,6 +128,7 @@ enum class ColorTheme(val label: String, val scheme: ColorScheme) {
     }
 }
 
+/** [fraction] is the amount of darkening */
 fun Color.darken(fraction: Float): Color = lerp(this, Color.Black, fraction)
 
 /** The frozen difficulty roles, read back: the colour a puzzle's difficulty is drawn in. */
@@ -152,20 +153,20 @@ fun AppTheme(
 
 @Composable
 fun switchColors(): SwitchColors = SwitchDefaults.colors(
-    checkedThumbColor = MaterialTheme.colorScheme.onSecondary,
-    uncheckedThumbColor = MaterialTheme.colorScheme.onSecondary,
-    disabledCheckedThumbColor = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.5f),
-    disabledUncheckedThumbColor = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.5f),
+    checkedThumbColor = Color.Black,
+    uncheckedThumbColor = Color.Black,
+    disabledCheckedThumbColor = Color.Black.copy(alpha = 0.5f),
+    disabledUncheckedThumbColor = Color.Black.copy(alpha = 0.5f),
 
-    checkedTrackColor = MaterialTheme.colorScheme.onTertiary,
+    checkedTrackColor = MaterialTheme.colorScheme.onTertiary.copy().darken(0.2f),
     uncheckedTrackColor = MaterialTheme.colorScheme.tertiary,
     disabledCheckedTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0f),
     disabledUncheckedTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0f),
 
-    checkedBorderColor = MaterialTheme.colorScheme.onPrimary,
-    uncheckedBorderColor = MaterialTheme.colorScheme.onPrimary,
-    disabledCheckedBorderColor = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.6f),
-    disabledUncheckedBorderColor = MaterialTheme.colorScheme.onSecondary.copy(alpha = 0.6f),
+    checkedBorderColor = Color.Black,
+    uncheckedBorderColor = Color.Black,
+    disabledCheckedBorderColor = Color.Black.copy(alpha = 0.6f),
+    disabledUncheckedBorderColor = Color.Black.copy(alpha = 0.6f),
 
     checkedIconColor = MaterialTheme.colorScheme.primary,
     uncheckedIconColor = MaterialTheme.colorScheme.primary,
