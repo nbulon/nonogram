@@ -111,12 +111,12 @@ enum class ColorTheme(val label: String, val scheme: ColorScheme) {
             onBackground = Color(0xFF12212E),
         )
     ),
-    PLUM(
-        "Plum", colorScheme(
-            primary = Color(0xFF2B1B33),
-            onPrimary = Color(0xFFE9A6C9),
-            secondary = Color(0xFF1C1123),
-            onSecondary = Color(0xFFC87FA8),
+    WOOD(
+        "Wood", colorScheme(
+            primary = Color(0xFF6B2400),
+            onPrimary = Color(0xFF61EDFF),
+            secondary = Color(0xFF2F1000),
+            onSecondary = Color(0xFF00D4F0),
             outline = Color(0xFFF5F5F5),
             onBackground = Color.White,
         )
@@ -153,18 +153,18 @@ fun AppTheme(
 
 @Composable
 fun switchColors(): SwitchColors = SwitchDefaults.colors(
-    checkedThumbColor = Color.Black,
-    uncheckedThumbColor = Color.Black,
+    checkedThumbColor = MaterialTheme.colorScheme.onSecondary.copy().darken(0.65f),
+    uncheckedThumbColor = MaterialTheme.colorScheme.onSecondary.copy().darken(0.65f),
     disabledCheckedThumbColor = Color.Black.copy(alpha = 0.5f),
     disabledUncheckedThumbColor = Color.Black.copy(alpha = 0.5f),
 
-    checkedTrackColor = MaterialTheme.colorScheme.onTertiary.copy().darken(0.2f),
+    checkedTrackColor = MaterialTheme.colorScheme.onTertiary,
     uncheckedTrackColor = MaterialTheme.colorScheme.tertiary,
     disabledCheckedTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0f),
     disabledUncheckedTrackColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0f),
 
-    checkedBorderColor = Color.Black,
-    uncheckedBorderColor = Color.Black,
+    checkedBorderColor = MaterialTheme.colorScheme.onSecondary.copy().darken(0.65f),
+    uncheckedBorderColor = MaterialTheme.colorScheme.onSecondary.copy().darken(0.65f),
     disabledCheckedBorderColor = Color.Black.copy(alpha = 0.6f),
     disabledUncheckedBorderColor = Color.Black.copy(alpha = 0.6f),
 
