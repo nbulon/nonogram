@@ -228,7 +228,7 @@ class FirebaseWebSyncService(private val sdk: AppSDK) : SyncService {
             doc(firestore, Paths.nonogram(nonogram.id)),
             FirebaseWeb.makePublishStatusData(
                 publishStatus = (if (approve) PublishStatus.APPROVED else PublishStatus.DENIED).name,
-                updatedAt = Clock.System.now().toEpochMilliseconds(),
+                updatedAt = nonogram.updatedAt,
                 difficulty = difficulty.name.takeIf { approve },
                 writeName = approve,
                 name = nonogram.name,

@@ -19,7 +19,7 @@ interface SyncService {
      */
     suspend fun pushNonogram(firebaseUid: String, nonogram: Nonogram, writePublishStatus: Boolean = false)
 
-    /** Pushes every locally authored puzzle; used once when an account first signs in. */
+    /** Pushes every locally authored puzzle; runs on each sign-in, after the owned pull has merged. */
     suspend fun uploadAllLocalNonograms(firebaseUid: String)
 
     /** Runs for guests too ([firebaseUid] null): approved puzzles are readable unauthenticated. */
@@ -48,6 +48,7 @@ interface SyncService {
      * Admin only: accepts [nonogram] at [difficulty] or denies it, and updates its author's denial
      * streak. Difficulty is the reviewer's call — authors never rate their own puzzles — so it is
      * written only when approving, and so is [Nonogram.name], which carries the reviewer's edit.
+     * The document's `updatedAt` is [Nonogram.updatedAt], so the caller can mirror the write locally.
      */
     suspend fun decideReview(
         firebaseUid: String,
@@ -59,9 +60,10 @@ interface SyncService {
 
 /**
  * Merge policy for pulled nonograms, shared by both platform implementations: a `DELETED`
- * tombstone removes the local row outright, otherwise remote newer → upsert locally, local newer
- * and locally authored → push back. Returns the newest received `updatedAt` timestamp for the
- * next incremental fetch. A null [firebaseUid] is a guest's unauthenticated public pull: merge in,
+ * tombstone removes the local row outright, a verdict on a locally `PENDING` puzzle is taken
+ * whatever the timestamps say, otherwise remote newer → upsert locally, local newer and locally
+ * authored → push back. Returns the newest received `updatedAt` timestamp for the next
+ * incremental fetch. A null [firebaseUid] is a guest's unauthenticated public pull: merge in,
  * never push back.
  */
 internal suspend fun SyncService.mergeRemoteNonograms(
@@ -83,7 +85,10 @@ internal suspend fun SyncService.mergeRemoteNonograms(
             if (local != null) sdk.deleteNonogram(remote.id)
             continue
         }
-        if (local == null || local.updatedAt < remote.updatedAt) {
+        
+        val decided = local?.publishStatus == PublishStatus.PENDING &&
+                remote.publishStatus != PublishStatus.PENDING
+        if (local == null || decided || local.updatedAt < remote.updatedAt) {
             sdk.upsertNonogramFromRemote(remote)
         } else if (
             firebaseUid != null &&

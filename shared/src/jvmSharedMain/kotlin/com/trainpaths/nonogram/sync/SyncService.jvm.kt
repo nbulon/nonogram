@@ -173,7 +173,7 @@ class FirebaseJvmSyncService(private val sdk: AppSDK) : SyncService {
                 Fields.PUBLISH_STATUS,
                 (if (approve) PublishStatus.APPROVED else PublishStatus.DENIED).name,
             )
-            put(Fields.UPDATED_AT, Clock.System.now().toEpochMilliseconds())
+            put(Fields.UPDATED_AT, nonogram.updatedAt)
             if (approve) {
                 put(Fields.DIFFICULTY, difficulty.name)
                 put(Fields.NAME, nonogram.name)

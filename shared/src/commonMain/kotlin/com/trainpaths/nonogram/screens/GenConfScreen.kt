@@ -67,7 +67,7 @@ fun GenConfScreen(
     onDone: () -> Unit,
     onDeleted: () -> Unit,
 ) {
-    var name by remember { mutableStateOf(genViewModel.nonogram.name.orEmpty()) }
+    var name by remember(genViewModel.nonogram.name) { mutableStateOf(genViewModel.nonogram.name.orEmpty()) }
     var rows by remember { mutableStateOf(genViewModel.height.toString()) }
     var cols by remember { mutableStateOf(genViewModel.width.toString()) }
     var pendingPublicSave by remember { mutableStateOf<(() -> Unit)?>(null) }
