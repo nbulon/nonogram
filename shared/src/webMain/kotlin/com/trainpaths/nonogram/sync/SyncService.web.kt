@@ -87,17 +87,6 @@ class FirebaseWebSyncService(private val sdk: AppSDK) : SyncService {
             Unit
         }
 
-    override suspend fun hasRemoteProgress(firebaseUid: String): Boolean =
-        gated(firebaseUid, "check remote failed", false) { fetchProgress(firebaseUid).isNotEmpty() }
-
-    override suspend fun uploadAllLocalProgress(firebaseUid: String) =
-        gated(firebaseUid, "upload all failed", Unit) { uploadAllProgress(sdk, firebaseUid) }
-
-    override suspend fun pullAllProgress(firebaseUid: String) =
-        gated(firebaseUid, "pull all failed", Unit) {
-            applyRemoteProgress(sdk, firebaseUid, fetchProgress(firebaseUid))
-        }
-
     override suspend fun pullAndMergeAllProgress(firebaseUid: String) =
         gated(firebaseUid, "pull and merge failed", Unit) {
             mergeRemoteProgress(sdk, firebaseUid, fetchProgress(firebaseUid))
@@ -120,13 +109,6 @@ class FirebaseWebSyncService(private val sdk: AppSDK) : SyncService {
                 FirebaseWeb.mergeOptions(),
             ).await()
             Unit
-        }
-
-    override suspend fun uploadAllLocalNonograms(firebaseUid: String) =
-        gated(firebaseUid, "upload all nonograms failed", Unit) {
-            for (nonogram in sdk.getNonogramsByAuthor(firebaseUid)) {
-                pushNonogram(firebaseUid, nonogram)
-            }
         }
 
     override suspend fun pullPublicNonogramsSince(firebaseUid: String?, since: Long): Long? {
@@ -157,7 +139,7 @@ class FirebaseWebSyncService(private val sdk: AppSDK) : SyncService {
                     where(Fields.UPDATED_AT, ">", since.toDouble().toJsNumber()),
                 )
             ).await()
-            mergeRemoteNonograms(sdk, firebaseUid, since, parseNonograms(snapshot))
+            mergeRemoteNonograms(sdk, firebaseUid, since, parseNonograms(snapshot), pushLocalOnly = since == 0L)
         }
 
     override suspend fun requestPublish(firebaseUid: String, nonogram: Nonogram): Boolean =

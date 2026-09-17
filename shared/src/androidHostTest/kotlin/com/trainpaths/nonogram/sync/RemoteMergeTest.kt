@@ -89,32 +89,16 @@ class RemoteMergeTest {
     }
 
     @Test
-    fun applyRemoteProgress_overwritesEvenWhenLocalIsNewer() = runTest {
-        val id = aNonogram()
-        sdk.saveProgressWithTimestamp(uid, id, "[[1,1],[1,1]]", 300)
-
-        applyRemoteProgress(sdk, uid, listOf(RemoteProgress(id, "[[0,0],[0,0]]", 200)))
-
-        val local = assertNotNull(sdk.getSingleProgress(uid, id))
-        assertEquals("[[0,0],[0,0]]", local.boardState)
-        assertEquals(200, local.updatedAt)
-        assertTrue(service.pushed.isEmpty())
-    }
-
-    @Test
-    fun uploadAllProgress_pushesEveryRowOfThatUserOnly() = runTest {
+    fun mergeRemoteProgress_pushesRowsTheRemoteLacksForThatUserOnly() = runTest {
         val first = sdk.addNonogram("EASY", listOf(listOf(1)))
         val second = sdk.addNonogram("EASY", listOf(listOf(0)))
         sdk.saveProgressWithTimestamp(uid, first, "[[1]]", 100)
         sdk.saveProgressWithTimestamp(uid, second, null, 200)
         sdk.saveProgressWithTimestamp("other-uid", first, "[[0]]", 300)
 
-        service.uploadAllProgress(sdk, uid)
+        service.mergeRemoteProgress(sdk, uid, listOf(RemoteProgress(first, "[[1]]", 100)))
 
-        assertEquals(
-            setOf(Push(uid, first, "[[1]]", 100), Push(uid, second, null, 200)),
-            service.pushed.toSet(),
-        )
+        assertEquals(listOf(Push(uid, second, null, 200)), service.pushed)
     }
 
     @Test
@@ -174,6 +158,27 @@ class RemoteMergeTest {
         )
 
         assertEquals(listOf(local), service.pushedNonograms)
+    }
+
+    @Test
+    fun mergeRemoteNonograms_fullOwnedPullPushesLocalOnlyPuzzles() = runTest {
+        sdk.upsertNonogramFromRemote(remote(42, updatedAt = 100))
+        val mine = remote(43, updatedAt = 100).copy(name = "Never pushed")
+        sdk.upsertNonogramFromRemote(mine)
+        sdk.upsertNonogramFromRemote(remote(44, updatedAt = 100, authorUid = "someone-else"))
+
+        service.mergeRemoteNonograms(sdk, uid, 0, listOf(remote(42, updatedAt = 100)), pushLocalOnly = true)
+
+        assertEquals(listOf(mine), service.pushedNonograms)
+    }
+
+    @Test
+    fun mergeRemoteNonograms_incrementalPullLeavesAbsentRowsAlone() = runTest {
+        sdk.upsertNonogramFromRemote(remote(43, updatedAt = 100))
+
+        service.mergeRemoteNonograms(sdk, uid, 50, listOf(remote(42, updatedAt = 100)))
+
+        assertTrue(service.pushedNonograms.isEmpty())
     }
 
     @Test
@@ -246,11 +251,7 @@ private class RecordingSyncService : SyncService {
         pushedNonograms += nonogram
     }
 
-    override suspend fun hasRemoteProgress(firebaseUid: String) = unused()
-    override suspend fun uploadAllLocalProgress(firebaseUid: String) = unused()
-    override suspend fun pullAllProgress(firebaseUid: String) = unused()
     override suspend fun pullAndMergeAllProgress(firebaseUid: String) = unused()
-    override suspend fun uploadAllLocalNonograms(firebaseUid: String) = unused()
     override suspend fun pullPublicNonogramsSince(firebaseUid: String?, since: Long) = unused()
     override suspend fun pullOwnedNonograms(firebaseUid: String, since: Long) = unused()
     override suspend fun requestPublish(firebaseUid: String, nonogram: Nonogram) = unused()

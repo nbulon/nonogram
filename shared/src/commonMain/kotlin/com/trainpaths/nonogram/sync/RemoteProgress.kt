@@ -11,8 +11,8 @@ internal data class RemoteProgress(
 
 /**
  * Merge policy for pulled progress, shared by both platform implementations: remote newer →
- * overwrite locally, local newer → push it back. Rows the remote has never seen are untouched;
- * [uploadAllProgress] is what carries those up.
+ * overwrite locally, local newer → push it back, and a row the remote has never seen → push it.
+ * [remotes] is always the whole collection, which is what makes the last rule safe.
  */
 internal suspend fun SyncService.mergeRemoteProgress(
     sdk: AppSDK,
@@ -27,22 +27,8 @@ internal suspend fun SyncService.mergeRemoteProgress(
             pushProgress(firebaseUid, nonogramId, local.boardState, local.updatedAt)
         }
     }
-}
-
-/** Remote wins outright, no comparison: the first pull onto a device that has no local rows yet. */
-internal suspend fun applyRemoteProgress(
-    sdk: AppSDK,
-    firebaseUid: String,
-    remotes: List<RemoteProgress>,
-) {
-    for ((nonogramId, boardState, updatedAt) in remotes) {
-        sdk.saveProgressWithTimestamp(firebaseUid, nonogramId, boardState, updatedAt)
-    }
-}
-
-/** The mirror of [applyRemoteProgress]: every local row up, for an account with nothing remote. */
-internal suspend fun SyncService.uploadAllProgress(sdk: AppSDK, firebaseUid: String) {
+    val remoteIds = remotes.mapTo(HashSet()) { it.nonogramId }
     for ((nonogramId, boardState, updatedAt) in sdk.getProgressForUserWithTimestamp(firebaseUid)) {
-        pushProgress(firebaseUid, nonogramId, boardState, updatedAt)
+        if (nonogramId !in remoteIds) pushProgress(firebaseUid, nonogramId, boardState, updatedAt)
     }
 }

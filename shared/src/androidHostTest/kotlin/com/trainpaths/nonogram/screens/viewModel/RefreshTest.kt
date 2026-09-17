@@ -101,12 +101,8 @@ private class HangingSyncService : SyncService {
     override suspend fun pushProgress(firebaseUid: String, nonogramId: Long, boardState: String?, updatedAt: Long) =
         hang()
 
-    override suspend fun hasRemoteProgress(firebaseUid: String): Boolean = hang()
-    override suspend fun uploadAllLocalProgress(firebaseUid: String) = hang()
-    override suspend fun pullAllProgress(firebaseUid: String) = hang()
     override suspend fun pullAndMergeAllProgress(firebaseUid: String) = hang()
     override suspend fun pushNonogram(firebaseUid: String, nonogram: Nonogram, writePublishStatus: Boolean) = hang()
-    override suspend fun uploadAllLocalNonograms(firebaseUid: String) = hang()
     override suspend fun pullPublicNonogramsSince(firebaseUid: String?, since: Long): Long = hang()
     override suspend fun pullOwnedNonograms(firebaseUid: String, since: Long): Long = hang()
     override suspend fun requestPublish(firebaseUid: String, nonogram: Nonogram): Boolean = hang()
