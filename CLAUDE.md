@@ -488,4 +488,6 @@ Desktop is distributed as unsigned `.msi` / `.deb` installers, built per push to
 and published as a GitHub Release with **version-less asset names**. That is the contract
 `screens/DesktopDownloadButton.web.kt` relies on: it hardcodes `releases/latest/download/<asset>` and is never
 rebuilt when a new installer ships. The web app renders that button floating at the viewport's bottom-right, hidden
-on the two board routes and under any dialog. See `docs/desktop-distribution.md`.
+on the two board routes and under any dialog. It offers whichever native build fits the visitor — the installer where
+`hasMouseAndKeyboard`, the Play listing on Android and other touch devices, nothing on iOS or macOS. See
+`docs/desktop-distribution.md`.

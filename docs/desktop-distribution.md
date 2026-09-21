@@ -155,14 +155,32 @@ uses; its ProGuard is disabled (Firestore's grpc stack is not worth the keep rul
 ## The download button
 
 `DesktopDownloadButton` is an `expect`/`actual` composable following the `GoogleSignInSection` pattern: the
-`jvmSharedMain` actual is empty (Android and desktop are already native), and the `webMain` actual owns the user-agent
-sniff, the release URLs and the click. It returns nothing where there is no build to offer — phones, and macOS — so
-common code only decides *where* it sits.
+`jvmSharedMain` actual is empty (Android and desktop are already native), and the `webMain` actual owns the whole
+decision — which app to offer, the URL, the label and the click — so common code only decides *where* it sits.
+
+It offers whichever native build actually fits the visitor, keyed off `hasMouseAndKeyboard` (`PlatformInput.web.kt`,
+`(pointer: fine) and (hover: hover)`) and the user agent:
+
+| Visitor | Offered |
+|---------|---------|
+| iOS | nothing — the iOS targets are commented out |
+| Android | "Download Android App" → the Play listing |
+| any other touch-first device | "Download Android App" — it can run the phone app, but has nowhere to put an installer |
+| Windows + mouse/keyboard | "Download Desktop App" → `Nonogram-windows-x64.msi` |
+| Linux + mouse/keyboard | "Download Desktop App" → `Nonogram-linux-x64.deb` |
+| macOS | nothing, until there is a signed `.dmg` |
+
+Order matters in that `when`: Android's user agent also contains `Linux`, so an Android tablet with a mouse attached
+would otherwise be offered a `.deb`. The lookup is `by lazy` rather than an eager top-level `val` because it reads
+`hasMouseAndKeyboard` out of another file, and Kotlin/JS does not guarantee the order two files' top-level
+initializers run in.
 
 `App.kt` places it in a `Box` wrapped around the `NavHost`, aligned `BottomEnd`. That `Box` is the app root and is
 deliberately not width-capped, so on a window wider than `MAX_CONTENT_WIDTH` the button lands in the gutter beside the
 content rather than on top of it. It is hidden on `GameRoute` and `GeneratorRoute`, where `BottomToolBar` owns that
 corner, and on any dialog destination, which is modal over whatever screen opened it.
 
-The click sets `window.location.href`. GitHub serves release assets with `Content-Disposition: attachment`, so the
-browser downloads the file and the single-page app is not navigated away from.
+An installer click sets `window.location.href`: GitHub serves release assets with
+`Content-Disposition: attachment`, so the browser downloads the file and the single-page app is not navigated away
+from. The store page is an ordinary page, so it gets `window.open(..., "_blank")` instead — that is what the
+`NativeApp.newTab` flag distinguishes.
