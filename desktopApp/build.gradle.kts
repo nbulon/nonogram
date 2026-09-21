@@ -7,8 +7,12 @@ plugins {
 }
 
 val nonogramEnv = providers.gradleProperty("nonogram.env").getOrElse("dev")
+val isProd = nonogramEnv == "prod"
+val desktopVersion = providers.gradleProperty("nonogram.desktopVersion").getOrElse("1.0.0")
 
 kotlin {
+    jvmToolchain(21)
+
     jvm("desktop")
 
     sourceSets {
@@ -38,15 +42,33 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
-            packageName = "nonogram"
-            packageVersion = "1.0.0"
+            packageName = if (isProd) "nonogram" else "nonogram-dev"
+            packageVersion = desktopVersion
+            vendor = "trainpaths"
             // sqlite-jdbc needs java.sql; Firestore's grpc/netty stack reaches for Unsafe
             modules("java.sql", "jdk.unsupported")
 
-            val iconDir = project.file("src/desktopMain/composeResources/drawable")
-            linux { iconFile.set(iconDir.resolve("icon.png")) }
-            windows { iconFile.set(iconDir.resolve("icon.ico")) }
-            macOS { iconFile.set(iconDir.resolve("icon.icns")) }
+            linux {
+                iconFile.set(project.file("src/desktopMain/composeResources/drawable/icon.png"))
+                debMaintainer = "dev@noahbachmann.ch"
+                appCategory = "Game"
+                menuGroup = "Games"
+                shortcut = true
+            }
+            windows {
+                iconFile.set(project.file("icons/icon.ico"))
+                upgradeUuid = if (isProd) {
+                    "8fd365e4-c993-44a9-bdf0-d5c674d38286"
+                } else {
+                    "3e781c5d-c42f-4999-90e1-6a32a681804c"
+                }
+                menuGroup = if (isProd) "Nonogram" else "Nonogram (dev)"
+                perUserInstall = true
+                dirChooser = true
+                shortcut = true
+                menu = true
+            }
+            macOS { iconFile.set(project.file("icons/icon.icns")) }
         }
 
         // Firestore's grpc stack under ProGuard is not worth the keep rules

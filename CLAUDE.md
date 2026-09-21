@@ -25,7 +25,9 @@ out). Users solve nonogram puzzles, track progress, and optionally sync via Goog
 
 # Desktop (JVM, Compose for Desktop) — dev by default, -Pnonogram.env=prod for the prod project
 ./gradlew :desktopApp:run
-./gradlew :desktopApp:packageDistributionForCurrentOS -Pnonogram.env=prod
+# Installer for the current OS only (jpackage). CI stamps the version; locally it defaults to 1.0.0
+./gradlew :desktopApp:packageReleaseDistributionForCurrentOS -Pnonogram.env=prod
+# Desktop deploy: a push to main runs .github/workflows/release-desktop.yml (GitHub Release) — see docs/desktop-distribution.md
 
 # iOS: open iosApp/ in Xcode
 ```
@@ -396,7 +398,9 @@ defined.
   `webApp/build.gradle.kts`. The two files declare the same object, so callers never see the switch — but a new constant
   has to be added to both. Desktop does the same with
   `desktopApp/src/{dev,prod}/kotlin/.../FirebaseConfig.desktop.kt`, whose `DATA_DIR_NAME` (`Nonogram-dev` /
-  `Nonogram`) keeps the two builds' database, auth store and preferences apart; `FirebaseDesktop.initialize`
+  `Nonogram`) keeps the two builds' database, auth store and preferences apart; the same flag also picks the
+  installer's `packageName` (`nonogram-dev` / `nonogram`) and its own Windows `upgradeUuid`, so a dev build installs
+  beside a prod one the way the `.dev` Android flavor does; `FirebaseDesktop.initialize`
   (desktopMain) boots gitlive's firebase-java-sdk from it, before Koin. Both are public-by-design client config; the
   only gitignored secrets are `keystore.properties` / `*.jks`.
 - **App Check** — **Android only.** Play Integrity in `prod`, the debug provider in `dev`, installed in
@@ -478,3 +482,10 @@ externals pattern, the kmpauth One Tap / token-client caveat, and the auth-sessi
 
 Desktop (JVM) runs the Android sync and sign-in code unchanged from `jvmSharedMain` on top of gitlive's
 firebase-java-sdk, with a file-backed JDBC database and auth store in a per-environment app data director
+
+Desktop is distributed as unsigned `.msi` / `.deb` installers, built per push to `main` by
+`.github/workflows/release-desktop.yml` (a GitHub-hosted matrix, because jpackage only produces the host OS's format)
+and published as a GitHub Release with **version-less asset names**. That is the contract
+`screens/DesktopDownloadButton.web.kt` relies on: it hardcodes `releases/latest/download/<asset>` and is never
+rebuilt when a new installer ships. The web app renders that button floating at the viewport's bottom-right, hidden
+on the two board routes and under any dialog. See `docs/desktop-distribution.md`.
