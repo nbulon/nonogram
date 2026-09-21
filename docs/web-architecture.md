@@ -4,8 +4,10 @@
 
 `shared` and `webApp` both build `js` and `wasmJs`. Kotlin's default source set hierarchy creates a shared
 `webMain` (dependsOn'd by both `jsMain` and `wasmJsMain`), so almost all web-specific code lives in `webMain`
-and only the two lines that construct the platform `Worker` live in `jsMain`/`wasmJsMain`. **wasmJs is the primary
-deployment target** (faster startup, smaller output); `js` stays as a fallback for older browsers.
+and only the two lines that construct the platform `Worker` live in `jsMain`/`wasmJsMain`. **wasmJs is the only
+deployed target** (faster startup, smaller output). `js` is still built and still tested (`tests.yml` runs
+`:shared:jsBrowserTest`), so it stays a working fallback for browsers without wasm-GC — it is simply not shipped
+today; see **Deploy** for why.
 
 ## Data layer: suspend all the way down
 
@@ -157,32 +159,38 @@ webhost as an nginx container. Every push to `main` deploys; `workflow_dispatch`
 
 ### Design
 
-The web app is static files, so the container is `nginx:alpine` plus two directories:
+The web app is static files, so the container is `nginx:alpine` plus one directory:
 
-| URL path | Gradle task                          | Copied from                                |
-|----------|--------------------------------------|--------------------------------------------|
-| `/`      | `:webApp:wasmJsBrowserDistribution`  | `webApp/build/dist/wasmJs/productionExecutable` |
-| `/js/`   | `:webApp:jsBrowserDistribution`      | `webApp/build/dist/js/productionExecutable`     |
+| URL path | Gradle task                         | Copied from                                     |
+|----------|-------------------------------------|-------------------------------------------------|
+| `/`      | `:webApp:wasmJsBrowserDistribution` | `webApp/build/dist/wasmJs/productionExecutable` |
 
-wasmJs is the primary target (see `docs/web-architecture.md`); `/js/` is a manual fallback for browsers without
-wasm-GC. Both `index.html`s reference their assets relatively (`webApp.js`, `sqlite3.js`, `skiko.wasm`), so serving the
-js build from a subdirectory needs no rewriting.
+**Only wasmJs is deployed.** The js bundle used to be served from `/js/` as a manual fallback, and building both is
+what the runner's memory budget could not sustain, so it was dropped. The js target is still compiled and tested —
+restoring the fallback is a second `jsBrowserDistribution` step plus a `COPY` in the `Dockerfile`, not new code.
 
 Two build steps, in two places:
 
-1. **Gradle runs on the runner.** It already has the JDK / Android SDK / Gradle setup `tests.yml` uses; a multi-stage
-   Docker build would re-download all of that on every run. The task is always `-Pnonogram.env=prod`, so the bundle
-   carries `webApp/src/prod/.../FirebaseConfig.web.kt`. The step overrides `gradle.properties` on the command line —
-   `nice -n 15`, `--no-daemon --no-parallel --max-workers=1`, a 1280 MB `-Xmx` with 256 MB metaspace (serial GC that
-   hands heap back once the compile is done, Kotlin compiler in-process) and a 384 MB `NODE_OPTIONS` heap for webpack
-   — because the defaults there (4 GB Gradle JVM, 3 GB Kotlin daemon, both targets bundling at once, daemons that
-   outlive the job) are sized for a dev machine, not a shared self-hosted runner. Summed across heap, metaspace, JVM
-   overhead and node that is about 2 GB, and the build is slower for it. On an out-of-memory failure raise `-Xmx`
-   first (a Kotlin compile `OutOfMemoryError`), `NODE_OPTIONS` second (a webpack "heap out of memory").
+1. **Gradle runs on the runner**, in *two separate invocations*. It already has the JDK / Android SDK / Gradle setup
+   `tests.yml` uses; a multi-stage Docker build would re-download all of that on every run. The task is always
+   `-Pnonogram.env=prod`, so the bundle carries `webApp/src/prod/.../FirebaseConfig.web.kt`.
+
+   The split — `compileProductionExecutableKotlinWasmJs`, then `wasmJsBrowserDistribution` — exists so the compile
+   JVM has exited before the native `wasm-opt` runs, rather than the two sitting on the runner's memory at once. It
+   is also why the two steps get different heaps: 1380 MB with 300 MB metaspace and a 128 MB code cache for the
+   Kotlin compile (serial GC that hands heap back, compiler in-process), then 640 MB with 256 MB metaspace for the
+   bundling step, alongside a 580 MB `NODE_OPTIONS` heap for webpack. Both run `--no-daemon --no-parallel
+   --max-workers=1`, because the `gradle.properties` defaults (4 GB Gradle JVM, 3 GB Kotlin daemon, daemons that
+   outlive the job) are sized for a dev machine, not a shared self-hosted runner.
+
+   Each step also writes `1000` to its own `/proc/self/oom_score_adj`: if the machine does run out of memory, the
+   kernel's OOM killer takes the build first instead of whatever else the runner is hosting. A failed build is
+   cheaper than a killed neighbour. On an out-of-memory failure raise `-Xmx` first (a Kotlin compile
+   `OutOfMemoryError`), `NODE_OPTIONS` second (a webpack "heap out of memory").
 2. **The image is built on the host.** The deploy step sets `DOCKER_HOST=ssh://<user>@<host>` and runs
    `docker compose -f webApp/compose.yml up -d --build`. The Docker CLI streams the build context to the host's daemon
    over SSH, the image is built and started there, and nothing is pushed to a registry. `webApp/.dockerignore` is a
-   whitelist, so the context is just `nginx.conf` and the two dist folders (source maps excluded).
+   whitelist, so the context is just `nginx.conf` and the wasmJs dist folder (source maps excluded).
 
 The files: `webApp/Dockerfile`, `webApp/nginx.conf`, `webApp/compose.yml`, `webApp/.dockerignore`.
 
@@ -243,16 +251,15 @@ On the host:
 ```bash
 docker ps --filter name=nonogram-web
 curl -I  http://127.0.0.1:8080/          # 200
-curl -I  http://127.0.0.1:8080/js/       # 200
 curl -sI http://127.0.0.1:8080/sqlite3.wasm | grep -i content-type   # application/wasm
 ```
 
-In a browser: `https://<domain>` loads, sign-in works, a puzzle in progress survives a reload (OPFS persisted);
-`https://<domain>/js/` loads the JS build.
+In a browser: `https://<domain>` loads, sign-in works, and a puzzle in progress survives a reload (OPFS persisted).
 
 ### Alternatives not taken
 
 - **Registry (GHCR) + `docker compose pull` on the host** — needs a token on the host and a public/private package;
   the SSH Docker context needs neither. Switch to it if the image ever needs to be deployed to more than one host.
-- **Automatic wasm → js fallback in `index.html`** — a feature-detect script could redirect to `/js/`; today the
-  fallback is a manual URL.
+- **Re-deploying the js bundle with a feature-detect fallback** — a script in `index.html` could redirect a browser
+  without wasm-GC to a `/js/` build. That means restoring the second `jsBrowserDistribution` step, which is exactly
+  the memory the runner did not have. Worth revisiting if the runner grows.

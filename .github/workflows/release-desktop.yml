@@ -1,0 +1,107 @@
+name: Release desktop
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'desktopApp/**'
+      - 'shared/**'
+      - 'gradle/**'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - '.github/workflows/release-desktop.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: release-desktop
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            format: msi
+            asset: Nonogram-windows-x64.msi
+          - os: ubuntu-latest
+            format: deb
+            asset: Nonogram-linux-x64.deb
+    # GitHub-hosted: jpackage only ever produces the host OS's format, and both self-hosted runners are Linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21 (Corretto)
+        uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: 21
+      # :androidApp and :shared's android target are configured even for a :desktopApp task
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Package (prod)
+        shell: bash
+        run: |
+          ./gradlew :desktopApp:packageReleaseDistributionForCurrentOS \
+            -Pnonogram.env=prod \
+            -Pnonogram.desktopVersion=1.0.${{ github.run_number }}
+
+      # Version-less names are the contract the web download button's permanent URL relies on
+      - name: Rename to the stable asset name
+        shell: bash
+        run: |
+          mkdir -p out
+          cp desktopApp/build/compose/binaries/main-release/${{ matrix.format }}/*.${{ matrix.format }} \
+             "out/${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installer-${{ matrix.format }}
+          path: out/*
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: desktop-v1.0.${{ github.run_number }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Nonogram for desktop, built from `main`.
+
+          | File | Platform |
+          |------|----------|
+          | `Nonogram-windows-x64.msi` | Windows 10/11 (x64) |
+          | `Nonogram-linux-x64.deb` | Debian/Ubuntu (x64) — `sudo apt install ./Nonogram-linux-x64.deb` |
+
+          These builds are **not code-signed**. Windows SmartScreen will show
+          "Windows protected your PC" on first run — click **More info → Run anyway**.
+          NOTES
+          gh release create "$TAG" out/* \
+            --repo "${{ github.repository }}" \
+            --title "Desktop 1.0.${{ github.run_number }}" \
+            --notes-file notes.md \
+            --latest
