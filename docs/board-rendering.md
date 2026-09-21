@@ -133,9 +133,10 @@ resets to `FILL`.
 
 ## Mouse and keyboard
 
-`hasMouseAndKeyboard` (`PlatformInput.kt`, an `expect val`: `true` on desktop and web, `false` on Android — the two
-JVM actuals are separate files because `jvmSharedMain` serves both) switches the board to controls that need a
-mouse:
+`hasMouseAndKeyboard` (`PlatformInput.kt`, an `expect val`: `true` on desktop, `false` on Android — the two
+JVM actuals are separate files because `jvmSharedMain` serves both — and on web the CSS media query
+`(pointer: fine) and (hover: hover)`, so a phone browser stays on the touch controls) switches the board to controls
+that need a mouse:
 
 - **The button is the pencil.** `mouseDrawMode(start, secondary)`: the secondary button erases, the primary toggles
   FILLED ↔ CROSSED and fills an empty tile. A stroke still fixes its target once from the tile it started on, so a

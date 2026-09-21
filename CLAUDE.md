@@ -250,8 +250,9 @@ the drawing and history groups use ("Pencil", "History"), since their buttons ar
 separate actions. The board group passes no title, so each of its buttons labels itself. Both shapes come out the same
 height (pill + one text line), which is what keeps every icon on one line.
 
-On mouse platforms (`hasMouseAndKeyboard`, `PlatformInput.kt` — desktop and web) the drawing group is hidden: the mouse
-button is the pencil (left toggles fill/cross, right erases) and `A`/`S`/`D`/`F` drive lock, check, undo and redo via
+On mouse platforms (`hasMouseAndKeyboard`, `PlatformInput.kt` — desktop, and web when the browser reports a mouse as
+the primary pointer) the drawing group is hidden: the mouse button is the pencil (left toggles fill/cross, right
+erases) and `A`/`S`/`D`/`F` drive lock, check, undo and redo via
 `Modifier.boardShortcuts` (`classes/BoardShortcuts.kt`, whose `BoardShortcut` table lists the mouse buttons too and
 feeds Settings' "Keybinds" dialog and the tutorial hints). See `docs/board-rendering.md → Mouse and keyboard`.
 
