@@ -83,8 +83,4 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
-
-    // App Check provider is chosen per flavor
-    "prodImplementation"(libs.firebase.appcheck.playintegrity)
-    "devImplementation"(libs.firebase.appcheck.debug)
 }

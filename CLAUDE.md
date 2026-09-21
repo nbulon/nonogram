@@ -172,9 +172,9 @@ initialize Koin DI and host the Compose UI.
   before the `currentFirebaseUid` gate, so guests pull public puzzles too — approved puzzles are readable
   unauthenticated (enforced by the Firestore rules), while progress, owned puzzles and the admin/moderation reads all
   need a session and stay behind the gate. `AdminViewModel` drives the admin review queue (one pending request at a
-  time, buffered a batch at a time); it stamps each decision's `updatedAt` itself and, when this device holds a copy
-  of the puzzle (the reviewer's own, or a pulled public one), writes the verdict onto that row too, so a
-  reviewer-author sees it without a sync. All depend on the suspend `AppSDK`/`SyncService` from inside
+  time, buffered a batch at a time); it stamps each decision's `updatedAt` itself and, when this device holds a copy of
+  the puzzle (the reviewer's own, or a pulled public one), writes the verdict onto that row too, so a reviewer-author
+  sees it without a sync. All depend on the suspend `AppSDK`/`SyncService` from inside
   `viewModelScope.launch` — but always via `launchGuarded` (`screens/viewModel/LaunchGuarded.kt`), never
   `viewModelScope.launch` directly: an uncaught throwable in a plain launch reaches the default handler and kills the
   process on Android. It rethrows `CancellationException` and routes everything else to `onError`; UI flags that gate a
@@ -188,17 +188,18 @@ initialize Koin DI and host the Compose UI.
   `currentUserUid` is an anomaly (auth not initialized), a null `currentFirebaseUid` is just a guest.
 
   **When sync runs.** `syncAll` fires once from `AppContent`'s app-start `LaunchedEffect`, once more inside a sign-in
-  (see **Firebase / Auth**), and after that only when the user pull-to-refreshes the menu (`MenuScreen`'s `PullToRefreshBox` → `MenuViewModel.refresh(sync)`, which takes the
-  pass itself as a suspend lambda — `authViewModel::syncAllNow` — so `isRefreshing` is set and cleared inside one
-  coroutine; a callback from another ViewModel that never arrived used to leave it spinning forever). Entering
+  (see **Firebase / Auth**), and after that only when the user pull-to-refreshes the menu (`MenuScreen`'s
+  `PullToRefreshBox` → `MenuViewModel.refresh(sync)`, which takes the pass itself as a suspend lambda —
+  `authViewModel::syncAllNow` — so `isRefreshing` is set and cleared inside one coroutine; a callback from another
+  ViewModel that never arrived used to leave it spinning forever). Entering
   `MenuRoute` does **not** sync — it calls `MenuViewModel.reload()`, a silent local-DB re-read with no spinner, so
   puzzles just authored in the generator still appear. `MenuViewModel` therefore has two flags: `isLoading`
   (full-screen spinner, cold start and sign-in/sign-out only, via `reload(loadAll = true)`) and `isRefreshing` (the
-  pull-to-refresh indicator). Entering `GeneratorRoute` or `GenConfRoute` calls `GenViewModel.reloadSaved()`, the
-  same idea for the puzzle in the editor: if the saved row's `updatedAt` moved on (a merge, or the admin's mirrored
-  verdict) it adopts the review fields — status, difficulty, name — and never the drawing. Opening the config screen
-  saves only when `canSave` (new or dirty): re-saving a clean puzzle re-stamps its `updatedAt`, which once left a
-  local `PENDING` copy and the remote `APPROVED` doc on the same timestamp, invisible to the merge.
+  pull-to-refresh indicator). Entering `GeneratorRoute` or `GenConfRoute` calls `GenViewModel.reloadSaved()`, the same
+  idea for the puzzle in the editor: if the saved row's `updatedAt` moved on (a merge, or the admin's mirrored verdict)
+  it adopts the review fields — status, difficulty, name — and never the drawing. Opening the config screen saves only
+  when `canSave` (new or dirty): re-saving a clean puzzle re-stamps its `updatedAt`, which once left a local `PENDING`
+  copy and the remote `APPROVED` doc on the same timestamp, invisible to the merge.
 
   **Every remote pass is bounded.** `syncAllNow` and `retryOwnNonograms` wrap their work in
   `withTimeoutOrNull(SYNC_TIMEOUT)`, and the fire-and-forget `syncAll`/`retryOwnNonograms`/`signOut` release their
@@ -252,17 +253,17 @@ the drawing and history groups use ("Pencil", "History"), since their buttons ar
 separate actions. The board group passes no title, so each of its buttons labels itself. Both shapes come out the same
 height (pill + one text line), which is what keeps every icon on one line.
 
-On mouse platforms (`hasMouseAndKeyboard`, `PlatformInput.kt` — desktop, and web when the browser reports a mouse as
-the primary pointer) the drawing group is hidden: the mouse button is the pencil (left toggles fill/cross, right
-erases) and `A`/`S`/`D`/`F` drive lock, check, undo and redo via
+On mouse platforms (`hasMouseAndKeyboard`, `PlatformInput.kt` — desktop, and web when the browser reports a mouse as the
+primary pointer) the drawing group is hidden: the mouse button is the pencil (left toggles fill/cross, right erases) and
+`A`/`S`/`D`/`F` drive lock, check, undo and redo via
 `Modifier.boardShortcuts` (`classes/BoardShortcuts.kt`, whose `BoardShortcut` table lists the mouse buttons too and
 feeds Settings' "Keybinds" dialog and the tutorial hints). See `docs/board-rendering.md → Mouse and keyboard`.
 
-On touch, both screens render 7 buttons, which does not fit a phone at a fixed width, so `BoxWithConstraints` sizes them: the
-icon-only buttons take a fixed `ICON_ITEM_WIDTH`, the labelled ones split what is left and ellipsize rather than
-overflow, and the group gap absorbs the remainder (clamped, with the row centred) — **the gaps are subtracted before the
-items are sized**, because handing the items the full width leaves the arrangement no slack and the grouping silently
-disappears. Icons come from the hand-built `icons/` package of `ImageVector`s.
+On touch, both screens render 7 buttons, which does not fit a phone at a fixed width, so `BoxWithConstraints` sizes
+them: the icon-only buttons take a fixed `ICON_ITEM_WIDTH`, the labelled ones split what is left and ellipsize rather
+than overflow, and the group gap absorbs the remainder (clamped, with the row centred) — **the gaps are subtracted
+before the items are sized**, because handing the items the full width leaves the arrangement no slack and the grouping
+silently disappears. Icons come from the hand-built `icons/` package of `ImageVector`s.
 
 ### DI (Koin)
 
@@ -398,21 +399,27 @@ defined.
   `webApp/build.gradle.kts`. The two files declare the same object, so callers never see the switch — but a new constant
   has to be added to both. Desktop does the same with
   `desktopApp/src/{dev,prod}/kotlin/.../FirebaseConfig.desktop.kt`, whose `DATA_DIR_NAME` (`Nonogram-dev` /
-  `Nonogram`) keeps the two builds' database, auth store and preferences apart; the same flag also picks the
-  installer's `packageName` (`nonogram-dev` / `nonogram`) and its own Windows `upgradeUuid`, so a dev build installs
-  beside a prod one the way the `.dev` Android flavor does; `FirebaseDesktop.initialize`
+  `Nonogram`) keeps the two builds' database, auth store and preferences apart; the same flag also picks the installer's
+  `packageName` (`nonogram-dev` / `nonogram`) and its own Windows `upgradeUuid`, so a dev build installs beside a prod
+  one the way the `.dev` Android flavor does; `FirebaseDesktop.initialize`
   (desktopMain) boots gitlive's firebase-java-sdk from it, before Koin. Both are public-by-design client config; the
   only gitignored secrets are `keystore.properties` / `*.jks`.
-- **App Check** — **Android only.** Play Integrity in `prod`, the debug provider in `dev`, installed in
-  `MainApplication.onCreate` *before* `startKoin` (Koin builds `FirebaseJvmSyncService`, which touches Firestore) via
-  `installAppCheck()`, which has one copy **per flavor** (`androidApp/src/{dev,prod}/`), with the provider artifacts
-  scoped `devImplementation` / `prodImplementation` to match. Provider therefore tracks the Firebase project, not
-  debuggability, which encodes the project's rule — **debug against dev, build for prod**. `devDebug` is the variant to
-  develop in; `prodRelease` is what ships; `devRelease` is only the local R8 smoke test. `prodDebug` is not used: once
-  prod App Check is enforced it cannot reach Firestore, since Play Integrity cannot attest a sideloaded APK. **Web has
-  no App Check** — reCAPTCHA v3 no longer has a free tier, so the provider, its externals and `RECAPTCHA_SITE_KEY` were
-  removed; `FirebaseWeb.initialize` just builds the app and hands back auth + Firestore. **Desktop has none either.**
-  Anything web- or desktop-facing must therefore stay unenforced in the Firebase console.
+- **App Check — removed, on every platform.** Android once ran Play Integrity in `prod` and the debug provider in
+  `dev`; that is gone, because Play Integrity cannot attest a de-Googled Android build (GrapheneOS and friends), so it
+  locked out legitimate users. Web never had it — reCAPTCHA v3 no longer has a free tier, so the provider, its externals
+  and `RECAPTCHA_SITE_KEY` were removed — and there is no desktop provider at all. **App Check must stay Unenforced in
+  both Firebase consoles**; enforcing it now would break every client.
+
+  What this does *not* change: the API key was never a credential. It identifies the project, ships in plaintext in the
+  APK, the web bundle and the desktop config, and authorizes nothing. **Firebase Auth plus the Firestore security rules
+  are the whole enforcement story**, so the rules carry all of it — field allowlists, type and size caps, and the
+  publish-status transitions. Both projects are on the **Spark** plan, and having no billing account attached is
+  deliberate: it caps abuse at daily-quota exhaustion rather than a bill.
+
+  The flavor rule survives its original justification: **debug against dev, build for prod**. `devDebug` is the variant
+  to develop in; `prodRelease` is what ships; `devRelease` is only the local R8 smoke test. `prodDebug` stays unused —
+  now by policy rather than because App Check blocked it: a sideloaded debuggable build has no business writing to prod
+  data.
 - `AppInitializer.onApplicationStart()` calls `KMPAuth.initialize { google(serverId = …) }` with a web client ID.
   Android passes `R.string.default_web_client_id` (generated from the flavor's `google-services.json`); web passes
   `FirebaseWebConfig.GOOGLE_WEB_CLIENT_ID`, desktop `FirebaseDesktopConfig.GOOGLE_WEB_CLIENT_ID`. All must be the same
@@ -427,12 +434,13 @@ defined.
   `pullPublicNonogramsSince` therefore takes a nullable uid: null is a guest's unauthenticated pull, and
   `mergeRemoteNonograms` (`sync/SyncService.kt`) then merges without ever pushing back. Merge policy is remote newer →
   upsert; local newer & locally authored → push back; a verdict on a locally `PENDING` puzzle (remote no longer
-  `PENDING`) is taken whatever the timestamps say, since a pending copy holds nothing the remote lacks. Both merges
-  also push rows the remote has never seen: `mergeRemoteProgress` always (the progress fetch is the whole
-  collection), `mergeRemoteNonograms` only on a full owned pull (`pushLocalOnly`, passed as `since == 0`). That is
-  what makes **sign-in a single ordinary pass**: `onFirebaseSignInSuccess` is `linkFirebaseUser` +
+  `PENDING`) is taken whatever the timestamps say, since a pending copy holds nothing the remote lacks. Both merges also
+  push rows the remote has never seen: `mergeRemoteProgress` always (the progress fetch is the whole collection),
+  `mergeRemoteNonograms` only on a full owned pull (`pushLocalOnly`, passed as `since == 0`). That is what makes
+  **sign-in a single ordinary pass**: `onFirebaseSignInSuccess` is `linkFirebaseUser` +
   `syncAllNow(fullOwned = true)` — the owned cursor survives sign-out, so it is ignored once to reach guest-authored
-  puzzles the link just moved onto the uid — and the screens do not sync again on `signInComplete`. On both platforms — Android via
+  puzzles the link just moved onto the uid — and the screens do not sync again on `signInComplete`. On both platforms —
+  Android via
   `dev.gitlive:firebase-firestore` (androidMain), web via hand-written Firebase JS SDK externals (webMain), both
   isolated behind `sync/SyncService`; the web impl gates every call on `sessionMatches` *except* the public pull, which
   must work signed out. Security rules are **not** checked in — they are maintained per project in the Firebase console
@@ -486,8 +494,8 @@ firebase-java-sdk, with a file-backed JDBC database and auth store in a per-envi
 Desktop is distributed as unsigned `.msi` / `.deb` installers, built per push to `main` by
 `.github/workflows/release-desktop.yml` (a GitHub-hosted matrix, because jpackage only produces the host OS's format)
 and published as a GitHub Release with **version-less asset names**. That is the contract
-`screens/DesktopDownloadButton.web.kt` relies on: it hardcodes `releases/latest/download/<asset>` and is never
-rebuilt when a new installer ships. The web app renders that button floating at the viewport's bottom-right, hidden
-on the two board routes and under any dialog. It offers whichever native build fits the visitor — the installer where
+`screens/DesktopDownloadButton.web.kt` relies on: it hardcodes `releases/latest/download/<asset>` and is never rebuilt
+when a new installer ships. The web app renders that button floating at the viewport's bottom-right, hidden on the two
+board routes and under any dialog. It offers whichever native build fits the visitor — the installer where
 `hasMouseAndKeyboard`, the Play listing on Android and other touch devices, nothing on iOS or macOS. See
 `docs/desktop-distribution.md`.
