@@ -25,7 +25,8 @@ out). Users solve nonogram puzzles, track progress, and optionally sync via Goog
 
 # Desktop (JVM, Compose for Desktop) — dev by default, -Pnonogram.env=prod for the prod project
 ./gradlew :desktopApp:run
-# Installer for the current OS only (jpackage). CI stamps the version; locally it defaults to 1.0.0
+# Installer for the current OS only (jpackage). Version is `nonogram.version` from gradle.properties
+# plus a patch: CI passes -Pnonogram.versionPatch=<run#>, a local build gets .0
 ./gradlew :desktopApp:packageReleaseDistributionForCurrentOS -Pnonogram.env=prod
 # Desktop deploy: a push to main runs .github/workflows/release-desktop.yml (GitHub Release) — see docs/desktop-distribution.md
 

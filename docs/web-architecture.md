@@ -159,7 +159,7 @@ as an nginx container. Every push to `main` deploys; `workflow_dispatch` reruns 
 
 ### Design
 
-The web app is static files, so the container is `nginx:alpine` plus one directory:
+The web app is static files, so the container is `nginx-unprivileged:alpine` plus one directory:
 
 | URL path | Gradle task                         | Copied from                                     |
 |----------|-------------------------------------|-------------------------------------------------|
@@ -190,13 +190,62 @@ Two build steps, in two places:
 2. **The image is built on the host.** The deploy step sets `DOCKER_HOST=ssh://<user>@<host>` and runs
    `docker compose -f webApp/compose.yml up -d --build`. The Docker CLI streams the build context to the host's daemon
    over SSH, the image is built and started there, and nothing is pushed to a registry. `webApp/.dockerignore` is a
-   whitelist, so the context is just `nginx.conf` and the wasmJs dist folder (source maps excluded).
+   whitelist, so the context is just the two conf files and the wasmJs dist folder (source maps excluded). Because
+   that whitelist un-ignores the **whole** dist tree and the runner checks out with `clean: false`, the deploy purges
+   `webApp/build/dist` before compiling — otherwise a file left there by an earlier run would be published at the
+   site's root.
 
-The files: `webApp/Dockerfile`, `webApp/nginx.conf`, `webApp/compose.yml`, `webApp/.dockerignore`.
+The files: `webApp/Dockerfile`, `webApp/nginx.conf`, `webApp/security-headers.conf`, `webApp/compose.yml`,
+`webApp/.dockerignore`. **The `.dockerignore` is a whitelist — a new file next to the `Dockerfile` is invisible to the
+build until it is un-ignored there.**
+
+### Rootless, and why the port is 8080
+
+The base image is `nginxinc/nginx-unprivileged`, not `nginx`. Stock nginx runs its master process as root purely to
+bind port 80; a static file server has no other need for it. The unprivileged image runs as uid 101 and listens on
+8080 instead, which lets `compose.yml` drop every capability (`cap_drop: [ALL]` — not even `NET_BIND_SERVICE`), set
+`no-new-privileges`, and mount the root filesystem `read_only`. Read-only works because that image's `nginx.conf`
+writes its pid to `/tmp`; the only writable mounts are `tmpfs` at `/tmp` and `/var/cache/nginx`.
+
+Only the *container* port moved. `WEB_PORT` still controls the host side and the publish is still loopback-only, so
+the reverse proxy is unaffected.
+
+`image:` carries `${IMAGE_TAG:-latest}`, and the workflow passes the commit sha. That is the rollback handle:
+`IMAGE_TAG=<older-sha> docker compose --project-name nonogram-web -f webApp/compose.yml up -d` on the host. Tagged
+images survive the deploy's `docker image prune -f` (it removes dangling images only), so they accumulate — that is
+the trade for being able to roll back.
+
+### Headers
 
 `nginx.conf` serves the content-hashed `*.wasm` chunks as `immutable` and everything else — whose names are stable
-across deploys — as `no-cache`. It sets no COOP/COEP headers: the `opfs-sahpool` VFS was chosen precisely so none are
-needed. `application/wasm` comes from nginx's stock `mime.types`.
+across deploys — as `no-cache`. `application/wasm` comes from nginx's stock `mime.types`.
+
+The security headers live in their own `security-headers.conf`, `include`d **inside each `location` block** rather
+than once at `server` level. That is not style: nginx's `add_header` *replaces* the inherited set rather than merging
+into it, so a `location` that sets its own `Cache-Control` silently drops every header declared in the parent. Any
+header added later has to go in that file, and any new `location` has to `include` it.
+
+COOP is `same-origin-allow-popups`, not `same-origin`: Google sign-in is a popup that reports back through
+`window.opener`, and full isolation severs it. COEP is still unset — the `opfs-sahpool` VFS was chosen precisely so
+none is needed.
+
+HSTS is deliberately absent here. This server speaks plain HTTP on loopback; `Strict-Transport-Security` belongs on
+the TLS-terminating reverse proxy, which is also what makes the site a secure context for OPFS.
+
+**The CSP ships as `Content-Security-Policy-Report-Only` and must be verified before it is enforced.** `index.html`
+has no inline `<script>`, so a real policy is achievable — but four allowances are load-bearing and each one fails a
+different feature, silently, on a path a smoke test will not reach:
+
+| Allowance | Needed by | Fails without it |
+|---|---|---|
+| `'wasm-unsafe-eval'` in `script-src` | the wasmJs module is compiled at runtime | the app never boots |
+| `https://accounts.google.com` in `script-src`, `style-src`, `frame-src` | kmpauth injects the GSI script *and* its stylesheet, and frames it | sign-in |
+| `blob:` in `img-src` and `worker-src` | `ImageDecode.web.kt`'s `createObjectURL`; the sqlite-wasm OPFS worker | image scanner, database |
+| `https://*.googleapis.com` in `connect-src` | Firebase auth + Firestore transport | all sync |
+
+To promote it: deploy, exercise all four paths on the live site with the DevTools console open, widen the policy to
+cover anything reported, then rename the header to `Content-Security-Policy` and deploy again. `style-src
+'unsafe-inline'` is a standing concession — Compose's canvas host and the GSI button both set inline styles.
 
 `compose.yml` publishes the container on `127.0.0.1:${WEB_PORT:-8080}` only. TLS is the host's reverse proxy's job —
 OPFS needs a secure context, so the site must be reached over `https://`.
@@ -213,7 +262,10 @@ OPFS needs a secure context, so the site must be reached over `https://`.
 
 - Docker Engine + compose plugin; `<user>` is in the `docker` group.
 - Reverse proxy rule: `https://<domain>` → `http://127.0.0.1:8080` (or whatever `WEB_PORT` is set to). If the proxy runs
-  in Docker on the same host, replace the `ports` entry in `compose.yml` with a shared external network instead.
+  in Docker on the same host, replace the `ports` entry in `compose.yml` with a shared external network instead — and
+  target the container on **8080**, not 80 (see **Rootless** above).
+- The proxy is also where `Strict-Transport-Security` belongs; the container serves plain HTTP and sets every other
+  security header itself.
 
 #### GitHub repository → Settings → Secrets and variables → Actions → Variables
 

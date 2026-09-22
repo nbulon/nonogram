@@ -33,6 +33,9 @@ jobs:
         with:
           cache-disabled: true
 
+      - name: Purge the previous distribution
+        run: rm -rf webApp/build/dist
+
       # Two invocations so the compile JVM is gone before the native wasm-opt runs beside it
       - name: Compile wasmJs (prod)
         run: |
@@ -57,6 +60,7 @@ jobs:
         env:
           DOCKER_HOST: ssh://${{ vars.SSH_TARGET }}
           WEB_PORT: ${{ vars.WEB_PORT || '8080' }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker compose --project-name nonogram-web -f webApp/compose.yml up -d --build --remove-orphans
           docker image prune -f
