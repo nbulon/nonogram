@@ -39,8 +39,10 @@ out). Users solve nonogram puzzles, track progress, and optionally sync via Goog
 # Android host tests (uses SQLite JVM driver, no emulator needed)
 ./gradlew :shared:testAndroidHostTest
 
-# Common tests only
+# Common tests, plus desktopTest's own
 ./gradlew :shared:desktopTest
+
+# Common tests only
 ./gradlew :shared:wasmJsTest
 ./gradlew :shared:jsTest
 
@@ -48,8 +50,9 @@ out). Users solve nonogram puzzles, track progress, and optionally sync via Goog
 ./gradlew :shared:iosSimulatorArm64Test
 ```
 
-Tests live in `shared/src/commonTest/` (pure-logic tests) and `shared/src/androidHostTest/` (tests that need a
-SQLDelight driver — uses `TestDatabaseFactory` with the SQLite JVM driver).
+Tests live in `shared/src/commonTest/` (pure-logic tests), `shared/src/androidHostTest/` (tests that need a
+SQLDelight driver — uses `TestDatabaseFactory` with the SQLite JVM driver) and `shared/src/desktopTest/` (pure-logic
+tests for desktop-only code, currently the update check's version comparison).
 
 ## Documenting changes
 
@@ -498,5 +501,11 @@ and published as a GitHub Release with **version-less asset names**. That is the
 `screens/DesktopDownloadButton.web.kt` relies on: it hardcodes `releases/latest/download/<asset>` and is never rebuilt
 when a new installer ships. The web app renders that button floating at the viewport's bottom-right, hidden on the two
 board routes and under any dialog. It offers whichever native build fits the visitor — the installer where
-`hasMouseAndKeyboard`, the Play listing on Android and other touch devices, nothing on iOS or macOS. See
-`docs/desktop-distribution.md`.
+`hasMouseAndKeyboard`, the Play listing on Android and other touch devices, nothing on iOS or macOS.
+
+An installed desktop build asks GitHub once per launch whether a newer release exists, and offers the installer in a
+dismissable card in that same bottom-right slot (`screens/UpdateBanner.desktop.kt` over `update/UpdateCheck.kt`; the
+other platforms' actuals are empty, so the two overlays never collide). The check is prod-only and needs the running
+build's own version, which `desktopApp`'s generated `BuildInfo` supplies — `nonogram.version` plus the
+`-Pnonogram.versionPatch` that only exists at build time. Dismissal is session-only: nothing is persisted, so the
+next launch asks again until the user actually updates. See `docs/desktop-distribution.md`.
