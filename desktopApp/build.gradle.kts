@@ -47,7 +47,8 @@ compose.desktop {
             packageVersion = "$versionBase.$versionPatch"
             vendor = "trainpaths"
             // sqlite-jdbc needs java.sql; Firestore's grpc/netty stack reaches for Unsafe
-            modules("java.sql", "jdk.unsupported")
+            // kmpauth's desktop OAuth loopback listens on com.sun.net.httpserver
+            modules("java.sql", "jdk.unsupported", "jdk.httpserver")
 
             linux {
                 iconFile.set(project.file("src/desktopMain/composeResources/drawable/icon.png"))
