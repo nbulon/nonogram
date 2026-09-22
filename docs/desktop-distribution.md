@@ -32,16 +32,37 @@ a permanent URL: `releases/latest/` resolves to whichever release was published 
 always has the same name. `shared/src/webMain/.../screens/DesktopDownloadButton.web.kt` hardcodes those two URLs and is
 never rebuilt when a new installer ships — **rename an asset in the workflow and you must rename it there too.**
 
-The release itself *is* versioned (`desktop-v1.0.<run#>`), so there is a history to roll back to; only the file names
+The release itself *is* versioned (`desktop-v<base>.<run#>`), so there is a history to roll back to; only the file names
 inside are stable. One caveat: `--latest` is repo-wide. If Android releases are ever tagged in this repo they would take
 over `releases/latest/`, and the web URLs would have to move to a fixed `desktop-latest` tag instead.
 
 ## Versioning
 
-`packageVersion` comes from `-Pnonogram.desktopVersion`, defaulting to `1.0.0` for local builds — the same
-`providers.gradleProperty(...).getOrElse(...)` idiom `nonogram.env` uses. CI passes `1.0.<github.run_number>`. MSI's
-ProductVersion is `major.minor.build` with major/minor ≤ 255 and build ≤ 65535, so that scheme is valid until run 65535
-and then needs a rethink.
+**`gradle.properties` is the only place a version is declared.** `nonogram.version` holds the
+`major.minor` base; the patch component is `-Pnonogram.versionPatch`, defaulting to `0` — the same
+`providers.gradleProperty(...).getOrElse(...)` idiom `nonogram.env` uses. `desktopApp` and `androidApp` both read the
+pair, so a desktop installer and an Android build from the same commit carry the same version. Bump the base there and
+nowhere else.
+
+CI passes `-Pnonogram.versionPatch=<github.run_number>`, so a released installer is `<base>.<run#>` and a local build of
+the same commit is `<base>.0`.
+
+The tag and the release title are **not** a second copy of that string. `release-desktop.yml` has a `version` job that
+reads the base out of `gradle.properties` once and exposes `version` / `tag` as job outputs; `build` and `release` both
+consume them. That is what stops the three from drifting — before it, the same expression was typed out in three
+places and a checkout of a release tag rebuilt as the `getOrElse` default instead of its own version.
+
+Two limits the scheme does not enforce:
+
+- MSI's ProductVersion is `major.minor.build` with major/minor ≤ 255 and build ≤ 65535. Since `packageVersion` feeds
+  every format (no `msiPackageVersion`/`debPackageVersion` override is set), the base's two components and the run
+  number are all bound by it.
+- `github.run_number` is counted per **workflow filename**. Renaming or recreating `release-desktop.yml` resets it to 1,
+  producing a version lower than what is already installed — which breaks MSI upgrade detection under the same
+  `upgradeUuid`. Bump `nonogram.version` at the same time as any such rename.
+
+A re-run of a failed workflow reuses its `github.run_number`, so the release step re-uploads onto the existing tag with
+`gh release upload --clobber` rather than failing on `gh release create`.
 
 ## Two environments, two installed apps
 
@@ -144,8 +165,8 @@ the resource tree costs nothing.
 # Current OS only, prod Firebase project
 ./gradlew :desktopApp:packageReleaseDistributionForCurrentOS -Pnonogram.env=prod
 
-# ...with a version stamp, the way CI does it
-./gradlew :desktopApp:packageReleaseDistributionForCurrentOS -Pnonogram.env=prod -Pnonogram.desktopVersion=1.0.99
+# ...with a version stamp, the way CI does it — the base still comes from gradle.properties
+./gradlew :desktopApp:packageReleaseDistributionForCurrentOS -Pnonogram.env=prod -Pnonogram.versionPatch=99
 ```
 
 Output lands in `desktopApp/build/compose/binaries/main-release/{msi,deb,dmg}/`. The `release` build type is the one CI

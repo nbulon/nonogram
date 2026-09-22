@@ -19,6 +19,9 @@ val keystoreProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+val versionBase = providers.gradleProperty("nonogram.version").getOrElse("1.1")
+val versionPatch = providers.gradleProperty("nonogram.versionPatch").getOrElse("0")
+
 android {
     namespace = "com.trainpaths.nonogram"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -27,8 +30,9 @@ android {
         applicationId = "com.trainpaths.nonogram"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
+        // increment manually
         versionCode = 11
-        versionName = "1.1.0"
+        versionName = "$versionBase.$versionPatch"
     }
 
     flavorDimensions += "env"

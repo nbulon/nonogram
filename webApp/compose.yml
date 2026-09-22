@@ -1,9 +1,28 @@
 services:
   web:
     build: .
-    image: nonogram-web:latest
+    image: nonogram-web:${IMAGE_TAG:-latest}
     container_name: nonogram-web
     restart: unless-stopped
+
+    # Static file server: no root, no capabilities, nothing writable but scratch space
+    user: "101:101"
+    read_only: true
+    cap_drop: [ ALL ]
+    security_opt: [ "no-new-privileges:true" ]
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    mem_limit: 628m
+    pids_limit: 128
+
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://127.0.0.1:8080/index.html" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
     ports:
       # Loopback only: the host's reverse proxy terminates TLS and forwards here
-      - "127.0.0.1:${WEB_PORT:-8080}:80"
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"

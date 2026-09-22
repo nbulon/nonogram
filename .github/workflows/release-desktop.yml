@@ -9,6 +9,7 @@ on:
       - 'gradle/**'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
+      - 'gradle.properties'
       - '.github/workflows/release-desktop.yml'
   workflow_dispatch:
 
@@ -17,10 +18,27 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  # Computes the version, so tag, release title and installer's internal version cannot differ
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: v
+        run: |
+          base=$(grep -E '^nonogram\.version=' gradle.properties | cut -d= -f2 | tr -d '[:space:]')
+          [ -n "$base" ] || { echo "nonogram.version missing from gradle.properties" >&2; exit 1; }
+          echo "version=$base.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          echo "tag=desktop-v$base.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -56,7 +74,7 @@ jobs:
         run: |
           ./gradlew :desktopApp:packageReleaseDistributionForCurrentOS \
             -Pnonogram.env=prod \
-            -Pnonogram.desktopVersion=1.0.${{ github.run_number }}
+            -Pnonogram.versionPatch=${{ github.run_number }}
 
       # Version-less names are the contract the web download button's permanent URL relies on
       - name: Rename to the stable asset name
@@ -73,7 +91,7 @@ jobs:
           retention-days: 7
 
   release:
-    needs: build
+    needs: [ build, version ]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -87,7 +105,9 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: desktop-v1.0.${{ github.run_number }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.version.outputs.tag }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           cat > notes.md <<'NOTES'
           Nonogram for desktop, built from `main`.
@@ -100,8 +120,13 @@ jobs:
           These builds are **not code-signed**. Windows SmartScreen will show
           "Windows protected your PC" on first run — click **More info → Run anyway**.
           NOTES
-          gh release create "$TAG" out/* \
-            --repo "${{ github.repository }}" \
-            --title "Desktop 1.0.${{ github.run_number }}" \
-            --notes-file notes.md \
-            --latest
+
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" out/* --repo "$REPO" --clobber
+          else
+            gh release create "$TAG" out/* \
+              --repo "$REPO" \
+              --title "Desktop $VERSION" \
+              --notes-file notes.md \
+              --latest
+          fi

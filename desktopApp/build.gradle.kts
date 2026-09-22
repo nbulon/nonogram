@@ -8,7 +8,8 @@ plugins {
 
 val nonogramEnv = providers.gradleProperty("nonogram.env").getOrElse("dev")
 val isProd = nonogramEnv == "prod"
-val desktopVersion = providers.gradleProperty("nonogram.desktopVersion").getOrElse("1.0.0")
+val versionBase = providers.gradleProperty("nonogram.version").getOrElse("1.1")
+val versionPatch = providers.gradleProperty("nonogram.versionPatch").getOrElse("0")
 
 kotlin {
     jvmToolchain(21)
@@ -43,7 +44,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Dmg, TargetFormat.Deb)
             packageName = if (isProd) "nonogram" else "nonogram-dev"
-            packageVersion = desktopVersion
+            packageVersion = "$versionBase.$versionPatch"
             vendor = "trainpaths"
             // sqlite-jdbc needs java.sql; Firestore's grpc/netty stack reaches for Unsafe
             modules("java.sql", "jdk.unsupported")
