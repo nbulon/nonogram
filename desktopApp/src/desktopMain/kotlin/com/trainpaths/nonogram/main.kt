@@ -25,6 +25,7 @@ import com.trainpaths.nonogram.screens.viewModel.MenuViewModel
 import com.trainpaths.nonogram.screens.viewModel.ScanViewModel
 import com.trainpaths.nonogram.screens.viewModel.SettingsViewModel
 import com.trainpaths.nonogram.tutorial.TutorialRepository
+import com.trainpaths.nonogram.update.UpdateCheck
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -52,6 +53,7 @@ fun main() {
     val authRepository = koinApp.koin.get<AuthRepository>()
     CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
         AppInitializer.initializeApp(appSDK, authRepository)
+        UpdateCheck.check(BuildInfo.VERSION, BuildInfo.IS_PROD)
     }
 
     application {

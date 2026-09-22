@@ -29,8 +29,9 @@ https://github.com/nbulon/nonogram/releases/latest/download/Nonogram-windows-x64
 ```
 
 a permanent URL: `releases/latest/` resolves to whichever release was published with `--latest`, and the file inside it
-always has the same name. `shared/src/webMain/.../screens/DesktopDownloadButton.web.kt` hardcodes those two URLs and is
-never rebuilt when a new installer ships — **rename an asset in the workflow and you must rename it there too.**
+always has the same name. Two files hardcode those URLs and neither is rebuilt when a new installer ships —
+`shared/src/webMain/.../screens/DesktopDownloadButton.web.kt` and `shared/src/desktopMain/.../update/Installer.kt`
+(see **The update prompt** below) — so **rename an asset in the workflow and you must rename it in both.**
 
 The release itself *is* versioned (`desktop-v<base>.<run#>`), so there is a history to roll back to; only the file names
 inside are stable. One caveat: `--latest` is repo-wide. If Android releases are ever tagged in this repo they would take
@@ -172,6 +173,47 @@ the resource tree costs nothing.
 Output lands in `desktopApp/build/compose/binaries/main-release/{msi,deb,dmg}/`. The `release` build type is the one CI
 uses; its ProGuard is disabled (Firestore's grpc stack is not worth the keep rules), so it differs from the plain
 `packageDistributionForCurrentOS` only in output directory.
+
+## The update prompt
+
+An installed desktop build has no way of learning that a newer one exists, so it asks once per launch.
+`shared/src/desktopMain/.../update/` holds the whole feature and `screens/UpdateBanner.desktop.kt` the card that
+floats in the same bottom-right slot as the web download button — never both, since each one's actual is empty on
+the other's platform.
+
+**The running build has to know its own version**, which nothing else in the app needed. `desktopApp`'s
+`generateBuildInfo` task writes `object BuildInfo { VERSION, IS_PROD }` into `build/generated/buildinfo/kotlin`,
+added to `desktopMain` with `kotlin.srcDir(generateBuildInfo)` next to the `src/$nonogramEnv/kotlin` flavor
+directory. It is generated rather than committed beside `FirebaseConfig.desktop.kt` because the patch component
+only ever exists as `-Pnonogram.versionPatch` at build time. `main.kt` passes both constants to
+`UpdateCheck.check` from the coroutine that already runs `AppInitializer.initializeApp`.
+
+Three gates, in order, before anything is fetched:
+
+- **Prod only.** A dev build is its own `packageName` with its own data directory; the prod release installs
+  *beside* it, so offering it would be wrong.
+- **An installer this OS can use.** `installerUrl()` is null on macOS — there is no `.dmg` — which is the same
+  rule the web button applies.
+- **A tag that is a desktop release.** `parseDesktopTag` accepts only `desktop-v<digits>(.<digits>)*`. `--latest`
+  is repo-wide, so a future Android release under `releases/latest` must produce no prompt rather than a wrong one.
+
+The fetch is `java.net.http.HttpClient` against `https://api.github.com/repos/nbulon/nonogram/releases/latest`,
+bounded by the client's connect timeout and the request timeout rather than `withTimeout` — `send` blocks its
+thread, so a coroutine timeout would have no suspension point to act on. It sends an explicit `User-Agent`; the
+GitHub API answers 403 without one. Every failure is a `println` and no prompt, the same best-effort shape
+`FirebaseJvmSyncService.logged` uses — a check that cannot reach GitHub must be invisible.
+
+**`java.net.http` is in the `modules(...)` list for this**, and that is the one thing `:desktopApp:run` cannot
+verify: jlink builds the runtime image from that list, so a missing entry works in development and throws
+`NoClassDefFoundError` — swallowed into "the banner never appears" — only in an installed build.
+
+`isNewer` compares components numerically, because `1.1.42` sorts before `1.1.5` as a string and the patch is a
+run number that will pass 9 within a few weeks. `shared/src/desktopTest/.../ReleaseVersionTest.kt` covers it.
+
+Dismissal is **session-only**: `UpdateCheck` is a process-wide object holding one `mutableStateOf`, with nothing
+persisted and no Koin binding. Closing the card hides it for that run; the next launch asks again, until the user
+actually installs the update. Nothing here can update the app itself — the installers are unsigned and there is no
+updater framework — so the button opens the installer URL in the browser and that is the end of the app's part.
 
 ## The download button
 

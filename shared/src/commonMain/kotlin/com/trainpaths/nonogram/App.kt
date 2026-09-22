@@ -53,6 +53,7 @@ import com.trainpaths.nonogram.screens.LoginScreen
 import com.trainpaths.nonogram.screens.MenuScreen
 import com.trainpaths.nonogram.screens.GenListScreen
 import com.trainpaths.nonogram.screens.SettingsScreen
+import com.trainpaths.nonogram.screens.UpdateBanner
 import com.trainpaths.nonogram.screens.viewModel.AdminViewModel
 import com.trainpaths.nonogram.screens.viewModel.AuthViewModel
 import com.trainpaths.nonogram.screens.viewModel.GameViewModel
@@ -362,7 +363,11 @@ private fun AppContent(
                         currentDestination?.hasRoute<GameRoute>() == true ||
                         currentDestination?.hasRoute<GeneratorRoute>() == true
                 if (!hidden) {
+                    // Never both: the download button is empty on desktop and the update banner is empty off it
                     DesktopDownloadButton(
+                        Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                    )
+                    UpdateBanner(
                         Modifier.align(Alignment.BottomEnd).padding(16.dp),
                     )
                 }
