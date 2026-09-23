@@ -38,7 +38,7 @@ sealed interface BoardTrigger {
  */
 enum class BoardShortcut(val trigger: BoardTrigger, val label: String) {
     DRAW(MouseButton.PRIMARY, "Toggle fill / cross"),
-    ERASE(MouseButton.SECONDARY, "Erase"),
+    ERASE(MouseButton.SECONDARY, "Toggle erase / cross"),
     LOCK(KeyPress(Key.A, "A"), "Lock/unlock board"),
     CHECK(KeyPress(Key.S, "S"), "Check board"),
     UNDO(KeyPress(Key.D, "D"), "Undo"),

@@ -131,11 +131,12 @@ enum class TutorialStep(val title: String, val text: String) {
 fun nextStep(seen: Set<TutorialStep>, registered: Set<TutorialStep>): TutorialStep? =
     TutorialStep.entries.firstOrNull { it !in seen && it in registered }
 
-/** " Press D / F." for keys, " Left-click: toggle fill / cross, right-click: erase." for mouse buttons — only where a mouse and keyboard are the norm. */
+/** " Press D / F." for keys, " Left-click: toggle fill / cross, right-click: toggle erase / cross." for mouse buttons — only where a mouse and keyboard are the norm. */
 private fun keyHint(vararg shortcuts: BoardShortcut): String = when {
     !hasMouseAndKeyboard -> ""
     shortcuts.first().trigger is BoardTrigger.MouseButton ->
         " " + shortcuts.joinToString(", ") { "${it.trigger.label}: ${it.label}".lowercase() }
             .replaceFirstChar { it.uppercase() } + "."
+
     else -> " Press " + shortcuts.joinToString(" / ") { it.trigger.label } + "."
 }

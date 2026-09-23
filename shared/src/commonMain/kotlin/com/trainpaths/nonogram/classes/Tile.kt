@@ -26,12 +26,12 @@ enum class DrawMode {
 }
 
 /**
- * A mouse edit carries its mode in the button: secondary erases, primary toggles fill/cross off the
- * tile it started on. The one edit path that reads a tile's existing state — resolved *before*
+ * A mouse edit carries its mode in the button, toggled off the tile it started on: primary fills an
+ * empty or crossed tile and crosses a filled one, secondary crosses an empty tile and erases the rest. The one edit path that reads a tile's existing state — resolved *before*
  * [DrawMode.target], so a stroke still fixes its target once.
  */
 fun mouseDrawMode(start: TileState, secondary: Boolean): DrawMode = when {
-    secondary -> DrawMode.ERASE
+    secondary -> if (start == TileState.NONE) DrawMode.CROSS else DrawMode.ERASE
     start == TileState.FILLED -> DrawMode.CROSS
     else -> DrawMode.FILL
 }

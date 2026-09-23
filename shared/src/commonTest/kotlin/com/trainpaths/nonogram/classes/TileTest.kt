@@ -54,10 +54,10 @@ class TileTest {
     }
 
     @Test
-    fun mouseDrawMode_secondaryAlwaysErases() {
-        for (start in TileState.entries) {
-            assertEquals(DrawMode.ERASE, mouseDrawMode(start, secondary = true), "$start")
-        }
+    fun mouseDrawMode_secondaryTogglesEraseAndCross() {
+        assertEquals(DrawMode.CROSS, mouseDrawMode(TileState.NONE, secondary = true))
+        assertEquals(DrawMode.ERASE, mouseDrawMode(TileState.FILLED, secondary = true))
+        assertEquals(DrawMode.ERASE, mouseDrawMode(TileState.CROSSED, secondary = true))
     }
 
     @Test

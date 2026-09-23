@@ -23,7 +23,7 @@ import com.trainpaths.nonogram.icons.mouseLeft
 import com.trainpaths.nonogram.icons.mouseRight
 import com.trainpaths.nonogram.icons.redo
 import com.trainpaths.nonogram.icons.searchCheck
-import com.trainpaths.nonogram.icons.tileErase
+import com.trainpaths.nonogram.icons.tileEraseToggle
 import com.trainpaths.nonogram.icons.tileToggle
 import com.trainpaths.nonogram.icons.undo
 
@@ -67,7 +67,7 @@ private fun Trigger(trigger: BoardTrigger) {
 private val BoardShortcut.icon: ImageVector
     get() = when (this) {
         BoardShortcut.DRAW -> tileToggle
-        BoardShortcut.ERASE -> tileErase
+        BoardShortcut.ERASE -> tileEraseToggle
         BoardShortcut.LOCK -> lockClosed
         BoardShortcut.CHECK -> searchCheck
         BoardShortcut.UNDO -> undo
