@@ -13,6 +13,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
 import com.trainpaths.nonogram.navigation.AppBarMode
 import com.trainpaths.nonogram.navigation.BottomToolBar
 import com.trainpaths.nonogram.navigation.TopAppBar
@@ -43,6 +50,14 @@ fun GameScreen(
     val onCheck = {
         viewModel.checkBoard()
         boardState.reset()
+    }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.saveCurrentProgress(pushRemote = false) }
+
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    if (lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) {
+        val backState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
+        NavigationBackHandler(state = backState) { onBack() }
     }
 
     Column(
@@ -76,7 +91,7 @@ fun GameScreen(
                     strikeSolvedClues = true,
                     state = boardState,
                     onTilesChanged = { if (tiles.toSolutionInts() == nonogram.solution) onWin() },
-                    onEdits = viewModel.history::record,
+                    onEdits = viewModel::recordEdits,
                 )
             }
         }
