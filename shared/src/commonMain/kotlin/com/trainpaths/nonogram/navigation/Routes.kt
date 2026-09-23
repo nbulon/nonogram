@@ -36,4 +36,4 @@ data class GameRoute(val nonogramId: Long)
 data class PlayDialogRoute(val nonogramId: Long, val difficulty: String)
 
 @Serializable
-data class ArtRoute(val nonogramId: Long, val won: Boolean)
+data class ArtRoute(val nonogramId: Long)

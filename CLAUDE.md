@@ -219,9 +219,9 @@ Type-safe navigation via `navigation-compose` with `@Serializable` route objects
 `LoginRoute`, `MenuRoute`, `GameRoute(nonogramId)`, `SettingsRoute`, `AdminRoute`, plus the generator routes
 `GenListRoute`,
 `GenConfRoute(editing)`, `GeneratorRoute` (the board editor), plus dialog routes: `PlayDialogRoute` (titled "Continue?" when the
-puzzle has saved progress) and `ArtRoute(nonogramId, won)` — `dialogs/ArtCardDialog`, the solution drawn as a picture
-on a card. A win opens it with `won = true` (Home / Restart, and the board's art rising into the card after
-`GameScreen` lifts the board off); a beaten menu card's Show button opens it with `won = false`.
+puzzle has saved progress) and `ArtRoute(nonogramId)` — the play dialog's Show button (offered once the puzzle is beaten)
+opens `dialogs/ArtCardDialog`, the solution drawn as a picture on a card. The win shows the same card from inside
+`GameScreen` (after the board lifts off), so its Restart calls `GameViewModel.resetBoard` directly.
 
 **Generator flow.** `GenConfRoute` is *linked to a specific `GeneratorRoute`* via its `editing` flag:
 

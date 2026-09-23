@@ -25,7 +25,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,7 +73,6 @@ fun NonogramCard(
     isOwn: Boolean = false,
     alwaysShowName: Boolean = true,
     status: CardStatus? = null,
-    onShow: (() -> Unit)? = null,
     onClick: () -> Unit
 ) {
     val isBeaten = (beatCount ?: 0L) > 0L
@@ -144,17 +142,6 @@ fun NonogramCard(
                 Row(Modifier.fillMaxSize()) {
                     DrawNonogram(if (showsSolution) nonogram.solution else progress)
                 }
-            }
-        }
-        if (onShow != null && isBeaten) {
-            TextButton(
-                onClick = onShow,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(4.dp)
-                    .background(MaterialTheme.colorScheme.outline, shape),
-            ) {
-                Text("Show")
             }
         }
     }
