@@ -12,7 +12,9 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
@@ -21,12 +23,10 @@ import kotlin.math.min
 /** Size of a tile in content space. Zoom is a transform, not a resize. */
 val CELL = 40.dp
 
-/**
- * Extent of one clue cell along the gutter's own axis — the width of a row-clue cell, the height of
- * a col-clue cell. Much thinner than [CELL]: a row of width W can hold up to `ceil(W / 2)` clues, so
- * at 48.dp the gutter would grow to half the grid and squeeze the board off-screen.
- */
-val CLUE_CELL = 22.dp
+val CLUE_CELL = 34.dp
+
+val CLUE_FONT_SIZE = 24.sp
+val CLUE_FONT_WEIGHT = FontWeight.Bold
 
 /**
  * Nominal width of the thinnest line on the board — the grid line between two tiles.
@@ -47,6 +47,9 @@ const val SEPARATOR_UNITS = 3f
 
 /** Height of a block-index label, as a fraction of [CELL]. Sized off the cell so it scales with the board. */
 const val BLOCK_LABEL_FONT_FRACTION = 0.30f
+
+/** Weight of the white outline carrying a block-index label, as a fraction of its font size. */
+const val BLOCK_LABEL_OUTLINE_FRACTION = 0.18f
 
 /** Gap between a block-index label and the lines it is tucked against, as a fraction of [CELL]. */
 const val BLOCK_LABEL_INSET_FRACTION = 0.12f
@@ -255,7 +258,7 @@ class BoardTransformState {
 
     val minScale: Float get() = fitScale
     val maxScale: Float get() = max(fitScale, 1f) * MAX_ZOOM_MULTIPLE
-    
+
     val canReset: Boolean get() = scale > fitScale * (1f + FIT_EPSILON)
 
     /** Viewport placement of the tile grid: after the *capped* gutter and its separator. */
