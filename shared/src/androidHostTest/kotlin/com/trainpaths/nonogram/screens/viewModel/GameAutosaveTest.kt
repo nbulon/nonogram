@@ -11,6 +11,7 @@ import com.trainpaths.nonogram.classes.Nonogram
 import com.trainpaths.nonogram.classes.PublishStatus
 import com.trainpaths.nonogram.classes.TileEdit
 import com.trainpaths.nonogram.classes.TileState
+import com.trainpaths.nonogram.settings.SettingsRepository
 import com.trainpaths.nonogram.sync.ModerationGate
 import com.trainpaths.nonogram.sync.SyncService
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,7 @@ class GameAutosaveTest {
     private lateinit var sdk: AppSDK
     private lateinit var authRepository: AuthRepository
     private lateinit var service: RecordingSyncService
+    private lateinit var settingsRepository: SettingsRepository
 
     private val uid = "player-1"
     private val puzzleId = 7L
@@ -51,6 +53,7 @@ class GameAutosaveTest {
         sdk = AppSDK(TestDatabaseFactory())
         authRepository = AuthRepository(sdk, MapSettings())
         service = RecordingSyncService()
+        settingsRepository = SettingsRepository(MapSettings())
     }
 
     @AfterTest
@@ -69,21 +72,21 @@ class GameAutosaveTest {
                 publishStatus = PublishStatus.APPROVED,
             )
         )
-        return GameViewModel(sdk, authRepository, service).also {
+        return GameViewModel(sdk, authRepository, service, settingsRepository).also {
             it.loadNonogram(puzzleId)
             it.awaitIdle()
         }
     }
 
-    /** Fills the [index]th tile the way the gesture layer does, then commits it as one stroke. */
-    private fun GameViewModel.stroke(index: Int) {
+    /** Sets the [index]th tile the way the gesture layer does, then commits it as one stroke. */
+    private fun GameViewModel.stroke(index: Int, after: TileState = TileState.FILLED) {
         val width = assertNotNull(nonogram).width
         val row = index / width
         val col = index % width
         val tile = tiles[row][col]
         val before = tile.state
-        tile.state = TileState.FILLED
-        recordEdits(listOf(TileEdit(row, col, before = before, after = TileState.FILLED)))
+        tile.state = after
+        recordEdits(listOf(TileEdit(row, col, before = before, after = after)))
     }
 
     /** One short of an autosave. */
@@ -202,7 +205,31 @@ class GameAutosaveTest {
         viewModel.history.redo()
         assertTrue(viewModel.solved)
     }
+
+    @Test
+    fun autoCrossFinishesACompletedRowAndUndoesWithTheStroke() = runTest(dispatcher) {
+        settingsRepository.setAutoCrossLines(true)
+        val viewModel = loadedViewModel()
+        viewModel.stroke(3, after = TileState.CROSSED)
+
+        // Row 0 is "...X#" once the clue's run is sealed, so its three blanks follow.
+        viewModel.stroke(4)
+        assertEquals(List(4) { TileState.CROSSED } + TileState.FILLED, viewModel.tiles[0].map { it.state })
+
+        viewModel.history.undo()
+        assertEquals(List(3) { TileState.NONE } + TileState.CROSSED + TileState.NONE, viewModel.tiles[0].map { it.state })
+    }
+
+    @Test
+    fun autoCrossIsOffByDefault() = runTest(dispatcher) {
+        val viewModel = loadedViewModel()
+        viewModel.stroke(3, after = TileState.CROSSED)
+        viewModel.stroke(4)
+
+        assertEquals(List(3) { TileState.NONE }, viewModel.tiles[0].take(3).map { it.state })
+    }
 }
+
 
 /**
  * Waits for the ViewModel's coroutines to finish. `advanceUntilIdle` is not enough: `AppSDK` hops to

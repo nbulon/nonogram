@@ -90,6 +90,25 @@ class TutorialStepTest {
     }
 
     @Test
+    fun settingsSteps_runInScreenOrder() {
+        val onScreen = setOf(
+            TutorialStep.SETTINGS_REPLAY,
+            TutorialStep.SETTINGS_AUTO_CROSS,
+            TutorialStep.SETTINGS_SHOW_NAMES,
+            TutorialStep.SETTINGS_THEME,
+        )
+        assertEquals(
+            listOf(
+                TutorialStep.SETTINGS_THEME,
+                TutorialStep.SETTINGS_SHOW_NAMES,
+                TutorialStep.SETTINGS_AUTO_CROSS,
+                TutorialStep.SETTINGS_REPLAY,
+            ),
+            walk(onScreen),
+        )
+    }
+
+    @Test
     fun everythingSeen_returnsNull() {
         assertNull(
             nextStep(

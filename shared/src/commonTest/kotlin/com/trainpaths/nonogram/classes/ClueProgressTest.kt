@@ -2,6 +2,7 @@ package com.trainpaths.nonogram.classes
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /** `#` filled, `X` crossed, `.` untouched. */
 private fun String.toCells(): List<TileState> = map { char ->
@@ -154,6 +155,84 @@ class ClueProgressTest {
                 actual = solvedClueMask(clues, marks),
                 message = "Unexpected mask for solved row $row",
             )
+        }
+    }
+
+    @Test
+    fun autoCross_crossesTheRestOfACompletedLine() {
+        val tiles = grid("#X...", ".....")
+        val edits = ClueProgress(tiles, rowClues = listOf(listOf(1), listOf(1)), colClues = List(5) { listOf(1) })
+            .autoCross(touched(0 to 0))
+
+        assertEquals(listOf("#XXXX", "....."), tiles.render())
+        assertEquals(listOf(2, 3, 4), edits.map { it.col })
+        assertTrue(edits.all { it.row == 0 && it.before == TileState.NONE && it.after == TileState.CROSSED })
+    }
+
+    @Test
+    fun autoCross_leavesAnOpenLineAlone() {
+        val tiles = grid("#....")
+        val edits = ClueProgress(tiles, rowClues = listOf(listOf(1)), colClues = List(5) { listOf(1) })
+            .autoCross(touched(0 to 0))
+
+        assertTrue(edits.isEmpty())
+        assertEquals(listOf("#...."), tiles.render())
+    }
+
+    @Test
+    fun autoCross_neverTouchesALineWithoutClues() {
+        val tiles = grid("...")
+        val edits = ClueProgress(tiles, rowClues = listOf(emptyList()), colClues = List(3) { emptyList() })
+            .autoCross(touched(0 to 0, 0 to 1, 0 to 2))
+
+        assertTrue(edits.isEmpty())
+    }
+
+    @Test
+    fun autoCross_cascadesIntoTheLinesItCompletes() {
+        // Crossing the rest of row 0 seals column 2's run, which then crosses its own last cell.
+        val tiles = grid(
+            "#X.",
+            "..#",
+            "..X",
+            "...",
+        )
+        val edits = ClueProgress(
+            tiles,
+            rowClues = listOf(listOf(1), listOf(1), emptyList(), emptyList()),
+            colClues = listOf(listOf(1), emptyList(), listOf(1)),
+        ).autoCross(touched(0 to 0))
+
+        assertEquals(listOf("#XX", "..#", "..X", "..X"), tiles.render())
+        assertEquals(listOf(0 to 2, 3 to 2), edits.map { it.row to it.col })
+    }
+
+    @Test
+    fun clueLine_maskFollowsTheTiles() {
+        val tiles = grid("#X...")
+        val line = ClueProgress(tiles, rowClues = listOf(listOf(1, 1)), colClues = List(5) { listOf(1) }).rows[0]
+        assertEquals(0b01L, line.mask)
+
+        tiles[0][2].state = TileState.FILLED
+        tiles[0][3].state = TileState.CROSSED
+        assertEquals(0b11L, line.mask)
+        assertTrue(line.isComplete)
+    }
+
+    /** The stroke that triggers an auto-cross; only the lines it touched matter. */
+    private fun touched(vararg cells: Pair<Int, Int>): List<TileEdit> =
+        cells.map { (row, col) -> TileEdit(row, col, before = TileState.NONE, after = TileState.FILLED) }
+
+    private fun grid(vararg rows: String): List<List<Tile>> =
+        rows.map { row -> row.toCells().map { state -> Tile().apply { this.state = state } } }
+
+    private fun List<List<Tile>>.render(): List<String> = map { row ->
+        row.joinToString("") {
+            when (it.state) {
+                TileState.FILLED -> "#"
+                TileState.CROSSED -> "X"
+                TileState.NONE -> "."
+            }
         }
     }
 }
