@@ -34,6 +34,8 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -45,6 +47,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -461,7 +464,11 @@ private fun Modifier.clueStrikes(
 private fun ClueText(value: Int) {
     Text(
         text = value.toString(),
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.titleLarge.copy(
+            fontSize = CLUE_FONT_SIZE,
+            lineHeight = CLUE_FONT_SIZE,
+            fontWeight = CLUE_FONT_WEIGHT,
+        ),
         color = Color.Black,
         textAlign = TextAlign.Center,
         maxLines = 1,
@@ -653,7 +660,7 @@ private fun DrawScope.drawBlockLabels(
     val inset = cellPx * BLOCK_LABEL_INSET_FRACTION * s
 
     val labelStyle = TextStyle(
-        color = Color.Gray,
+        color = Color.DarkGray,
         fontSize = fontPx.toSp(),
         lineHeight = fontPx.toSp(),
         lineHeightStyle = LineHeightStyle(
@@ -661,6 +668,16 @@ private fun DrawScope.drawBlockLabels(
             trim = LineHeightStyle.Trim.Both,
         ),
     )
+
+    val outline = Stroke(
+        width = fontPx * BLOCK_LABEL_OUTLINE_FRACTION,
+        cap = StrokeCap.Round,
+        join = StrokeJoin.Round,
+    )
+    fun drawLabel(label: TextLayoutResult, topLeft: Offset) {
+        drawText(label, color = Color.White, topLeft = topLeft, drawStyle = outline)
+        drawText(label, topLeft = topLeft)
+    }
 
     val anchorX = (state.gridTx + state.gridWpx * s).coerceAtMost(size.width).coerceAtLeast(state.gridTx)
     val anchorY = (state.gridTy + state.gridHpx * s).coerceAtMost(size.height).coerceAtLeast(state.gridTy)
@@ -670,13 +687,13 @@ private fun DrawScope.drawBlockLabels(
         val x = state.gridTx + column * cell
         if (x < 0f || x > size.width) continue // line itself is off-screen; nothing to label
         val label = labelMeasurer.measure(column.toString(), labelStyle)
-        drawText(label, topLeft = Offset(x - inset - label.size.width, anchorY - inset - label.size.height))
+        drawLabel(label, Offset(x - inset - label.size.width, anchorY - inset - label.size.height))
     }
     for (row in 1 until rows) {
         if (row % BLOCK_SIZE != 0) continue
         val y = state.gridTy + row * cell
         if (y < 0f || y > size.height) continue
         val label = labelMeasurer.measure(row.toString(), labelStyle)
-        drawText(label, topLeft = Offset(anchorX - inset - label.size.width, y - inset - label.size.height))
+        drawLabel(label, Offset(anchorX - inset - label.size.width, y - inset - label.size.height))
     }
 }

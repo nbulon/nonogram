@@ -60,8 +60,10 @@ It floats over the grid and gutters on a translucent black scrim rather than try
 sizing it to the corner rect was the first design, and at fit on a large board that rect is a few dp across.
 It shows only while `state.canReset`.
 
-Clue gutters use the thin `CLUE_CELL` (22.dp) along their own axis, not `CELL` (40.dp), because a row of width W holds
-up to `ceil(W/2)` clues — at full cell size the gutter would eat half the screen.
+Clue gutters use the thin `CLUE_CELL` (30.dp) along their own axis, not `CELL` (40.dp), because a row of width W holds
+up to `ceil(W/2)` clues — at full cell size the gutter would eat half the screen. Thin, but not arbitrarily so: a clue
+is centred in its slot, so the slack `CLUE_CELL` leaves around two bold digits *is* the gap between neighbouring clues,
+and `10 12` in a slot sized to merely fit reads as one number.
 
 ## `BoardTransformState`
 
@@ -277,4 +279,6 @@ rather than living inside `drawTiles`, which paints in content px under the grid
 `graphicsLayer` and would drag the numbers along with a pan same as the tiles. Font size is a fraction of `CELL`
 (`BLOCK_LABEL_FONT_FRACTION`), so it scales with the board like everything else, but a numeral can't be widened the way
 a line's stroke can: below `BLOCK_LABEL_MIN_DEVICE_PX` rendered height the labels are dropped outright rather than
-floored.
+floored. The numbers sit *inside* the field, so they land on tiles: each is drawn twice from one measurement — a white
+`Stroke` pass (`BLOCK_LABEL_OUTLINE_FRACTION` of the font size, round join and cap so a `1`'s corners don't spike) under
+a dark-grey fill — which is what makes them read over a filled cell as well as an empty one.
