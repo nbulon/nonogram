@@ -13,9 +13,16 @@ import com.trainpaths.nonogram.classes.TileEdit
 import com.trainpaths.nonogram.classes.TileState
 import com.trainpaths.nonogram.classes.progressIntToTileState
 import com.trainpaths.nonogram.classes.toProgressInts
+import com.trainpaths.nonogram.classes.toSolutionInts
 import com.trainpaths.nonogram.classes.toSolutionOrNull
 import com.trainpaths.nonogram.sync.SyncService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+
+/** Board changes between auto saves. */
+internal const val AUTOSAVE_STROKE_INTERVAL = 10
 
 class GameViewModel(
     private val sdk: AppSDK,
@@ -28,7 +35,11 @@ class GameViewModel(
     var tiles: List<List<Tile>> by mutableStateOf(emptyList())
         private set
 
-    val history = BoardHistory()
+    /** [BoardHistory.onApply] fires on undo/redo, which move the board as much as a stroke does. */
+    val history = BoardHistory(onApply = { noteBoardChange() })
+
+    private var changesSinceSave = 0
+    private var saveJob: Job? = null
 
     val currentNonogramId: Long?
         get() = nonogram?.id
@@ -36,9 +47,13 @@ class GameViewModel(
     val currentProgress: List<List<Int>>
         get() = tiles.toProgressInts()
 
+    private val isSolved: Boolean
+        get() = nonogram?.let { tiles.toSolutionInts() == it.solution } == true
+
     fun loadNonogram(id: Long) {
         nonogram = null
         tiles = emptyList()
+        changesSinceSave = 0
         launchGuarded(onError = { println("Game: loading nonogram $id failed: ${it.message}") }) {
             val loaded: Nonogram? = sdk.getNonogramById(id)
             if (loaded != null) {
@@ -60,20 +75,40 @@ class GameViewModel(
         }
     }
 
-    fun saveCurrentProgress(win: Boolean = false) {
+    /** One completed stroke or tap from the board: journalled, and counted toward the next autosave. */
+    fun recordEdits(edits: List<TileEdit>) {
+        if (edits.isEmpty()) return
+        history.record(edits)
+        noteBoardChange()
+    }
+
+    private fun noteBoardChange() {
+        if (++changesSinceSave < AUTOSAVE_STROKE_INTERVAL) return
+        saveCurrentProgress(pushRemote = false)
+    }
+
+    /** Writes the board out, and resets the autosave counter. [pushRemote] is off for autosaves */
+    fun saveCurrentProgress(win: Boolean = false, pushRemote: Boolean = true) {
+        if (!win && isSolved) return
+        changesSinceSave = 0
         val userUid = authRepository.currentUserUid.value.orMissing() ?: return
         val nonogramId = nonogram?.id ?: return
         val board = currentProgress
-        launchGuarded(
+        val previous = saveJob
+        saveJob = launchGuarded(
             Dispatchers.Default,
             onError = { println("Game: saving progress for $nonogramId failed: ${it.message}") },
         ) {
-            if (win) {
-                sdk.saveProgressAfterWin(userUid, nonogramId)
-            } else {
-                sdk.saveProgress(userUid, nonogramId, board)
+            withContext(NonCancellable) {
+                previous?.join()
+                if (win) {
+                    sdk.saveProgressAfterWin(userUid, nonogramId)
+                } else {
+                    sdk.saveProgress(userUid, nonogramId, board)
+                }
             }
 
+            if (!pushRemote) return@launchGuarded
             val firebaseUid = authRepository.currentFirebaseUid.orMissing() ?: return@launchGuarded
             val progress = sdk.getSingleProgress(userUid, nonogramId) ?: return@launchGuarded
             syncService.pushProgress(firebaseUid, nonogramId, progress.boardState, progress.updatedAt)
@@ -110,5 +145,6 @@ class GameViewModel(
             }
         }
         history.record(edits)
+        changesSinceSave = 0
     }
 }
