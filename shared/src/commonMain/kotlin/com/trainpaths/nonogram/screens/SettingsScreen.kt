@@ -52,6 +52,9 @@ import com.trainpaths.nonogram.tutorial.TutorialStep
 import com.trainpaths.nonogram.tutorial.tutorialAnchor
 import com.trainpaths.nonogram.auth.AuthState
 
+private val SETTINGS_BUTTON_HEIGHT = 42.dp
+private val SETTINGS_ITEM_GAP = 16.dp
+
 @Composable
 fun SettingsScreen(
     authViewModel: AuthViewModel,
@@ -65,6 +68,7 @@ fun SettingsScreen(
     val authState by authViewModel.authState.collectAsState()
     val theme by settingsViewModel.theme.collectAsState()
     val showAllNames by settingsViewModel.showAllNames.collectAsState()
+    val autoCrossLines by settingsViewModel.autoCrossLines.collectAsState()
     val isAdmin by authViewModel.isAdmin.collectAsState()
     val signInComplete by authViewModel.signInComplete.collectAsState()
 
@@ -113,48 +117,51 @@ fun SettingsScreen(
                 }
             }
             SettingsDivider()
-            Row(
-                modifier = Modifier.fillMaxWidth().tutorialAnchor(TutorialStep.SETTINGS_SHOW_NAMES),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    "Always show names",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
-                Switch(
+            Column(verticalArrangement = Arrangement.spacedBy(SETTINGS_ITEM_GAP)) {
+                SettingsToggle(
+                    text = "Always show names",
                     checked = showAllNames,
                     onCheckedChange = { settingsViewModel.setShowAllNames(it) },
-                    colors = switchColors(),
+                    step = TutorialStep.SETTINGS_SHOW_NAMES,
+                )
+                SettingsToggle(
+                    text = "Auto-cross line",
+                    checked = autoCrossLines,
+                    onCheckedChange = { settingsViewModel.setAutoCrossLines(it) },
+                    step = TutorialStep.SETTINGS_AUTO_CROSS,
                 )
             }
             SettingsDivider()
-            if (hasMouseAndKeyboard) {
+            Column(verticalArrangement = Arrangement.spacedBy(SETTINGS_ITEM_GAP)) {
+                if (hasMouseAndKeyboard) {
+                    AppButton(
+                        text = "Keybinds",
+                        onClick = { showKeybinds = true },
+                        modifier = Modifier.fillMaxWidth(),
+                        height = SETTINGS_BUTTON_HEIGHT,
+                    )
+                }
                 AppButton(
-                    text = "Keybinds",
-                    onClick = { showKeybinds = true },
-                    modifier = Modifier.fillMaxWidth(),
+                    text = "Show tips again",
+                    onClick = { tutorialRepository.resetAll() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .tutorialAnchor(TutorialStep.SETTINGS_REPLAY),
+                    height = SETTINGS_BUTTON_HEIGHT,
                 )
-            }
-            AppButton(
-                text = "Show tips again",
-                onClick = { tutorialRepository.resetAll() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .tutorialAnchor(TutorialStep.SETTINGS_REPLAY),
-            )
-            if (isAdmin) {
-                AppButton(
-                    text = "Admin panel",
-                    onClick = onAdminPanel,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (isAdmin) {
+                    AppButton(
+                        text = "Admin panel",
+                        onClick = onAdminPanel,
+                        modifier = Modifier.fillMaxWidth(),
+                        height = SETTINGS_BUTTON_HEIGHT,
+                    )
+                }
             }
             if (isSigningIn) {
                 SettingsDivider()
                 Row(
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    modifier = Modifier.fillMaxWidth().height(SETTINGS_BUTTON_HEIGHT),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                 ) {
@@ -175,7 +182,7 @@ fun SettingsScreen(
                         isSigningIn = true
                         authViewModel.onFirebaseSignInSuccess(uid, displayName)
                     },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    modifier = Modifier.fillMaxWidth().height(SETTINGS_BUTTON_HEIGHT),
                 )
             } else if (authState == AuthState.SIGNED_IN) {
                 SettingsDivider()
@@ -184,6 +191,7 @@ fun SettingsScreen(
                     onClick = { showSignOutDialog = true },
                     containerColor = MaterialTheme.colorScheme.onSecondary,
                     modifier = Modifier.fillMaxWidth(),
+                    height = SETTINGS_BUTTON_HEIGHT,
                 )
             }
         }
@@ -200,6 +208,31 @@ fun SettingsScreen(
                 onSignOut()
             },
             onCancel = { showSignOutDialog = false },
+        )
+    }
+}
+
+@Composable
+private fun SettingsToggle(
+    text: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    step: TutorialStep,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().tutorialAnchor(step),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onPrimary,
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = switchColors(),
         )
     }
 }

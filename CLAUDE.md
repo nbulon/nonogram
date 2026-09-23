@@ -104,7 +104,8 @@ initialize Koin DI and host the Compose UI.
   restores that account's puzzles and progress.
 - **`settings/SettingsRepository`** — holds the app's persisted preferences via `multiplatform-settings`: the selected
   `ColorTheme` (key `color_theme`, stores the enum name) and `showNames` (key `show_names`, default
-  `false` — the Settings screen's "Always show names" switch, read by `MenuViewModel`). Same shape as `AuthRepository`:
+  `false` — the Settings screen's "Always show names" switch, read by `MenuViewModel`) and `autoCrossLines` (key
+  `auto_cross_lines`, default `false` — "Auto-cross line", read by `GameViewModel`). Same shape as `AuthRepository`:
   reads synchronously in the constructor (no `initialize()` needed), exposes a `StateFlow` per preference, writes
   through on set. See **AppTheme** below.
 - **`sync/SyncService`** — interface for syncing *both* progress and the shared `nonograms` collection (push/pull/merge;
@@ -130,7 +131,8 @@ initialize Koin DI and host the Compose UI.
 - **`classes/` board + game** — the interactive grid (clues, tiles, pan/zoom, drag-to-draw) is a self-contained Compose
   engine: `Board`/`BoardTransform` (one Canvas for all tiles + a layer-transform pan/zoom model),
   `Tile`/`TileState`, `ClueProgress` (which clues the player has certainly drawn, struck out in the
-  game screen's gutters), and `RezoomButton` — fit-to-screen, floating over the board's top-left on a translucent scrim
+  game screen's gutters — one derived `ClueLine.mask` per line, read by both the gutters and "Auto-cross line", which
+  crosses the blanks of every fully struck line from `GameViewModel.recordEdits`), and `RezoomButton` — fit-to-screen, floating over the board's top-left on a translucent scrim
   and shown only while the board is zoomed in (`BoardTransformState.canReset`). Performance-critical and gesture-heavy —
   see `docs/board-rendering.md`.
 - **Desktop widths** — `MAX_CONTENT_WIDTH = 1000.dp` lives in `AppTheme.kt` alongside the palettes, applied as

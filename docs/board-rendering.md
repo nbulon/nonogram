@@ -195,10 +195,10 @@ grid from fresh `Tile`s.
 
 ## Struck-out clues
 
-`GameScreen` passes `strikeSolvedClues = true` and every clue the player has **certainly drawn** gets
-a dark-grey diagonal struck through it (`solvedClueMask`, `classes/ClueProgress.kt`). `GenScreen`
-leaves the flag off: its clues are derived from the tiles being drawn, so all of them would be
-struck, always.
+`GameScreen` passes its `ClueProgress` (owned by `GameViewModel`) and every clue the player has
+**certainly drawn** gets a dark-grey diagonal struck through it (`solvedClueMask`,
+`classes/ClueProgress.kt`). `GenScreen` passes none: its clues are derived from the tiles being drawn,
+so all of them would be struck, always.
 
 The rule is deliberately *not* solver-grade. Asking whether a clue is uniquely placeable given the
 marks hands the player deductions they had not made yet — ruinous on a line full of 1s and 2s. It
@@ -218,10 +218,21 @@ The consequence is that a player who never crosses out blanks sees almost nothin
 completed line whose gaps are `NONE` strikes nothing, the same line with them `CROSSED` strikes
 everything. That is the price of not doing the player's work for them.
 
+**Auto-cross line** (a setting, off by default) takes the rule one step further, still only on the
+player's own marks: when a committed stroke leaves every clue of a line struck (`ClueLine.isComplete`),
+`GameViewModel.recordEdits` has `ClueProgress.autoCross` cross that line's remaining `NONE` tiles, and
+cascades into the perpendicular lines those crosses complete. The crosses are appended to the stroke's
+own `TileEdit`s, so one undo takes both back; undo and redo never trigger it. A line with no clues is
+never auto-crossed — it has nothing to strike.
+
+`ClueProgress` holds one `ClueLine` per row and column, whose `mask` is `derivedStateOf` over that
+line's tile states. It is the only place `solvedClueMask` runs: the gutters draw from it, and
+auto-cross (below) reads the same cached value rather than evaluating the line a second time.
+
 Rendering follows the check mark's lead. `Modifier.clueStrikes` (`Board.kt`) hangs one
-`drawWithContent` on each clue *line* — not on each number — and reads that line's tile states inside
-it, so an edit invalidates one line's draw and the up-to-30 `ClueText` nodes it holds never
-recompose. Undo/redo and `resetBoard` write `Tile.state` as well, so they are covered with no
+`drawWithContent` on each clue *line* — not on each number — and reads that line's `mask` inside
+it, so an edit invalidates at most one line's draw — and only when its mask actually changed — and the
+up-to-30 `ClueText` nodes it holds never recompose. Undo/redo and `resetBoard` write `Tile.state` as well, so they are covered with no
 `onApply` hook. The strike is drawn in the gutter's own content space and rides its layer transform;
 it deliberately does not read `state.scale`, which would redraw every clue line on every zoom step.
 

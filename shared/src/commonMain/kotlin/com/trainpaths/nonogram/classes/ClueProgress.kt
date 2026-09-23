@@ -1,5 +1,8 @@
 package com.trainpaths.nonogram.classes
 
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+
 /**
  * Which clues of one line the player has *certainly drawn*
  * It only reads what the player has explicitly marked, so it can never hand them a
@@ -48,4 +51,48 @@ fun solvedClueMask(clues: List<Int>, cells: List<TileState>): Long {
         start = end
     }
     return mask
+}
+
+/** One row or column of a board: its clues, its tiles, and which of those clues are struck ([solvedClueMask]). */
+class ClueLine(val clues: List<Int>, val cells: List<Tile>) {
+    /** Derived state, so the gutter's strike drawing and auto-cross share one evaluation per change. */
+    val mask: Long by derivedStateOf { solvedClueMask(clues, cells.map { it.state }) }
+
+    val isComplete: Boolean get() = clues.isNotEmpty() && mask == (1L shl clues.size) - 1
+}
+
+/** The [ClueLine]s of a whole board. */
+class ClueProgress(private val tiles: List<List<Tile>>, rowClues: List<List<Int>>, colClues: List<List<Int>>) {
+    val rows: List<ClueLine> = rowClues.mapIndexed { row, clues -> ClueLine(clues, tiles[row]) }
+    val cols: List<ClueLine> = colClues.mapIndexed { col, clues -> ClueLine(clues, tiles.map { it[col] }) }
+
+    /**
+     * Crosses the empty tiles of every complete line [edits] touched, cascading into the lines those crosses complete.
+     * Mutates the tiles and returns its own edits, for the stroke's undo step.
+     */
+    fun autoCross(edits: List<TileEdit>): List<TileEdit> {
+        val pendingRows = ArrayDeque(edits.map { it.row }.distinct())
+        val pendingCols = ArrayDeque(edits.map { it.col }.distinct())
+        val crosses = mutableListOf<TileEdit>()
+
+        fun cross(row: Int, col: Int): Boolean {
+            val tile = tiles[row][col]
+            if (tile.state != TileState.NONE) return false
+            tile.state = TileState.CROSSED
+            crosses += TileEdit(row, col, before = TileState.NONE, after = TileState.CROSSED)
+            return true
+        }
+
+        while (pendingRows.isNotEmpty() || pendingCols.isNotEmpty()) {
+            pendingRows.removeFirstOrNull()?.let { row ->
+                if (rows.getOrNull(row)?.isComplete != true) return@let
+                for (col in tiles[row].indices) if (cross(row, col)) pendingCols.addLast(col)
+            }
+            pendingCols.removeFirstOrNull()?.let { col ->
+                if (cols.getOrNull(col)?.isComplete != true) return@let
+                for (row in tiles.indices) if (cross(row, col)) pendingRows.addLast(row)
+            }
+        }
+        return crosses
+    }
 }

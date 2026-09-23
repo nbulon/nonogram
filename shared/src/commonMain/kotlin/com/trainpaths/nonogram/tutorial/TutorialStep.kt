@@ -35,6 +35,10 @@ enum class TutorialStep(val title: String, val text: String) {
         title = "Always show names",
         text = "On: puzzle descriptions are visible up front. Off: descriptions stays hidden until you solve it.",
     ),
+    SETTINGS_AUTO_CROSS(
+        title = "Auto-cross line",
+        text = "On: once every clue of a row or column is crossed out, its remaining empty tiles get crossed for you.",
+    ),
     SETTINGS_REPLAY(
         title = "Repeat tutorials",
         text = "Lost? This brings all of these tips back from the beginning.",

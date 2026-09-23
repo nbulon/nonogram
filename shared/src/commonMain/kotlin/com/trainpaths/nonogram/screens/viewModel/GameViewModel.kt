@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import com.trainpaths.nonogram.AppSDK
 import com.trainpaths.nonogram.auth.AuthRepository
 import com.trainpaths.nonogram.classes.BoardHistory
+import com.trainpaths.nonogram.classes.ClueProgress
 import com.trainpaths.nonogram.classes.Nonogram
 import com.trainpaths.nonogram.classes.Tile
 import com.trainpaths.nonogram.classes.TileEdit
@@ -15,6 +16,7 @@ import com.trainpaths.nonogram.classes.progressIntToTileState
 import com.trainpaths.nonogram.classes.toProgressInts
 import com.trainpaths.nonogram.classes.toSolutionInts
 import com.trainpaths.nonogram.classes.toSolutionOrNull
+import com.trainpaths.nonogram.settings.SettingsRepository
 import com.trainpaths.nonogram.sync.SyncService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,11 +30,14 @@ class GameViewModel(
     private val sdk: AppSDK,
     private val authRepository: AuthRepository,
     private val syncService: SyncService,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
 
     var nonogram: Nonogram? by mutableStateOf(null)
         private set
     var tiles: List<List<Tile>> by mutableStateOf(emptyList())
+        private set
+    var clueProgress: ClueProgress? by mutableStateOf(null)
         private set
 
     /** Whether the last committed change left the board matching the solution; the screen plays the win from it. */
@@ -54,6 +59,7 @@ class GameViewModel(
     fun loadNonogram(id: Long) {
         nonogram = null
         tiles = emptyList()
+        clueProgress = null
         changesSinceSave = 0
         solved = false
         launchGuarded(onError = { println("Game: loading nonogram $id failed: ${it.message}") }) {
@@ -72,6 +78,7 @@ class GameViewModel(
                     row.map { value -> Tile().apply { state = progressIntToTileState(value) } }
                 }
                     ?: List(loaded.height) { List(loaded.width) { Tile() } }
+                clueProgress = ClueProgress(tiles, loaded.rowClues, loaded.colClues)
                 history.reset(tiles)
             }
         }
@@ -80,7 +87,9 @@ class GameViewModel(
     /** One completed stroke or tap from the board: journalled, and counted toward the next autosave. */
     fun recordEdits(edits: List<TileEdit>) {
         if (edits.isEmpty()) return
-        history.record(edits)
+        // Recorded with the stroke that caused them, so one undo takes both back.
+        val crosses = clueProgress?.takeIf { settingsRepository.autoCrossLines.value }?.autoCross(edits).orEmpty()
+        history.record(edits + crosses)
         afterBoardChange()
     }
 

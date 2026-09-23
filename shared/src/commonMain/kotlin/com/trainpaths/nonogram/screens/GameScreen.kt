@@ -127,7 +127,7 @@ fun GameScreen(
                     modifier = Modifier.fillMaxSize(),
                     isEditable = !viewModel.solved,
                     drawMode = drawMode,
-                    strikeSolvedClues = true,
+                    clueProgress = viewModel.clueProgress,
                     state = boardState,
                     onEdits = viewModel::recordEdits,
                 )

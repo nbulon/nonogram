@@ -48,4 +48,20 @@ class SettingsRepositoryTest {
         assertTrue(restored.showNames.value)
         assertEquals(ColorTheme.DEFAULT, restored.theme.value)
     }
+
+    @Test
+    fun noSavedPreference_autoCrossLinesDefaultsToFalse() {
+        val repo = SettingsRepository(MapSettings())
+        assertFalse(repo.autoCrossLines.value)
+    }
+
+    @Test
+    fun setAutoCrossLines_persistsAcrossRepositoryInstances() {
+        val settings = MapSettings()
+        SettingsRepository(settings).setAutoCrossLines(true)
+
+        val restored = SettingsRepository(settings)
+        assertTrue(restored.autoCrossLines.value)
+        assertFalse(restored.showNames.value)
+    }
 }
