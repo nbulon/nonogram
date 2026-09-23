@@ -7,13 +7,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -115,7 +111,6 @@ private fun AppContent(
     }
 
     val navController = rememberNavController()
-    var onResetBoard by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val currentDestination = navController.currentBackStackEntryAsState().value?.destination
 
@@ -163,7 +158,6 @@ private fun AppContent(
                                     )
                                 )
                             },
-                            onShowClick = { ng -> navController.navigate(ArtRoute(ng.id, won = false)) },
                             onGenClick = {
                                 navController.navigate(GenListRoute)
                             },
@@ -284,15 +278,16 @@ private fun AppContent(
                                 }
                             },
                             onDismiss = { navController.popBackStack() },
+                            onShow = {
+                                navController.navigate(ArtRoute(route.nonogramId)) {
+                                    popUpTo<PlayDialogRoute> { inclusive = true }
+                                }
+                            },
                         )
                     }
                     composable<GameRoute> { entry ->
                         val route: GameRoute = entry.toRoute()
                         val viewModel = gameViewModelFactory()
-                        DisposableEffect(viewModel) {
-                            onResetBoard = viewModel::resetBoard
-                            onDispose { onResetBoard = null }
-                        }
                         LaunchedEffect(route.nonogramId) {
                             viewModel.loadNonogram(route.nonogramId)
                         }
@@ -311,8 +306,10 @@ private fun AppContent(
                                     menuViewModel.clearProgress(id)
                                     menuViewModel.incrementBeatCount(id)
                                 }
-                                viewModel.currentNonogramId?.let { id ->
-                                    navController.navigate(ArtRoute(id, won = true))
+                            },
+                            onHome = {
+                                navController.navigate(MenuRoute) {
+                                    popUpTo(MenuRoute) { inclusive = true }
                                 }
                             },
                             onSwapMode = {
@@ -335,16 +332,7 @@ private fun AppContent(
                         }
                         ArtCardDialog(
                             nonogram = nonogram,
-                            won = route.won,
-                            onHome = {
-                                navController.navigate(MenuRoute) {
-                                    popUpTo(MenuRoute) { inclusive = true }
-                                }
-                            },
-                            onRestart = {
-                                onResetBoard?.invoke()
-                                navController.popBackStack()
-                            },
+                            won = false,
                             onClose = { navController.popBackStack() },
                         )
                     }

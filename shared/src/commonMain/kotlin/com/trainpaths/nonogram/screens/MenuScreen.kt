@@ -40,7 +40,6 @@ fun MenuScreen(
     viewModel: MenuViewModel,
     onRefresh: () -> Unit,
     onNonogramClick: (Nonogram) -> Unit,
-    onShowClick: (Nonogram) -> Unit,
     onGenClick: () -> Unit,
     onMoreFilters: () -> Unit,
 ) {
@@ -99,7 +98,6 @@ fun MenuScreen(
                             beatCount = viewModel.getBeatCount(nonogram.id),
                             isOwn = nonogram.isOwned(viewModel.authorUid),
                             alwaysShowName = showAllNames,
-                            onShow = { onShowClick(nonogram) },
                             onClick = { onNonogramClick(nonogram) })
                     }
                 }

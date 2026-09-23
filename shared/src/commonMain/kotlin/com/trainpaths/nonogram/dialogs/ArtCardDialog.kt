@@ -38,16 +38,23 @@ import com.trainpaths.nonogram.icons.refresh
 
 /**
  * A beaten puzzle's solution as a picture on a card. Opened by a win ([won]: the art rises in from
- * where the board left, with Home/Restart) or by a menu card's Show button (static, close only).
+ * where the board left, with Home/Restart) or by the play dialog's Show button (static, close only).
  */
 @Composable
 fun ArtCardDialog(
     nonogram: Nonogram,
     won: Boolean,
-    onHome: () -> Unit,
-    onRestart: () -> Unit,
     onClose: () -> Unit,
+    onHome: () -> Unit = {},
+    onRestart: () -> Unit = {},
 ) {
+    var open by remember { mutableStateOf(true) }
+    if (!open) return
+    fun closeThen(action: () -> Unit): () -> Unit = {
+        open = false
+        action()
+    }
+
     var settled by remember { mutableStateOf(!won) }
     LaunchedEffect(Unit) { settled = true }
     val rise = animateFloatAsState(
@@ -59,7 +66,7 @@ fun ArtCardDialog(
     val fadeIn = Modifier.graphicsLayer { alpha = rise.value }
 
     Dialog(
-        onDismissRequest = if (won) onRestart else onClose,
+        onDismissRequest = closeThen(onClose),
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Box(modifier = Modifier.padding(24.dp).widthIn(max = 360.dp)) {
@@ -102,15 +109,11 @@ fun ArtCardDialog(
                     horizontalArrangement = Arrangement.End,
                 ) {
                     if (won) {
-                        IconButton(onClick = onRestart) {
+                        IconButton(onClick = closeThen(onRestart)) {
                             Icon(imageVector = refresh, contentDescription = "Restart")
                         }
-                        IconButton(onClick = onHome) {
+                        IconButton(onClick = closeThen(onHome)) {
                             Icon(imageVector = home, contentDescription = "Home")
-                        }
-                    } else {
-                        IconButton(onClick = onClose) {
-                            Icon(imageVector = close, contentDescription = "Close")
                         }
                     }
                 }
