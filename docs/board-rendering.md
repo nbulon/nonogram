@@ -105,7 +105,7 @@ Four stacked `pointerInput` nodes on the gesture Box. Compose dispatches the **M
    axis and pans the board on the other; a pinch always transforms the board and pins the rest of the gesture to that
    (`activeRegion`).
 5. **`detectBoardDrawGestures`** — innermost, so it gets first refusal. It takes a gesture only while
-   `isLocked() || secondary` (a right-button drag always erases, see below) and otherwise skips to the next down so
+   `isLocked() || secondary` (a right-button drag always draws, see below) and otherwise skips to the next down so
    the transform detector pans. Commits a one-pointer stroke only after touch slop (a second finger before that hands
    off to pinch); once committed it consumes every change so the transform detector can't also pan.
    `TileStroke` fixes its target state once from the mode (`mode.target`) and visits each cell at
@@ -140,9 +140,10 @@ JVM actuals are separate files because `jvmSharedMain` serves both — and on we
 `(pointer: fine) and (hover: hover)`, so a phone browser stays on the touch controls) switches the board to controls
 that need a mouse:
 
-- **The button is the pencil.** `mouseDrawMode(start, secondary)`: the secondary button erases, the primary toggles
-  FILLED ↔ CROSSED and fills an empty tile. A stroke still fixes its target once from the tile it started on, so a
-  left-drag from an empty cell fills the whole run and from a filled cell crosses it. A right-drag erases whether the
+- **The button is the pencil.** `mouseDrawMode(start, secondary)`: the primary button toggles FILLED ↔ CROSSED and
+  fills an empty tile; the secondary crosses an empty tile and erases a filled or crossed one. A stroke still fixes its
+  target once from the tile it started on, so a left-drag from an empty cell fills the whole run and from a filled cell
+  crosses it, a right-drag from an empty cell crosses the run and from a marked one erases it. A right-drag draws whether the
   board is locked or not — right has no panning use, so only the left button obeys the lock. On web,
   `suppressContextMenu()` (`PlatformInput.web.kt`, called from `webApp`'s `main`) keeps the browser menu off the canvas.
 - **The pencil group is hidden.** `BottomToolBar` drops the "Pencil" `ToolGroup` and its counts adjust (one fewer
@@ -153,7 +154,7 @@ that need a mouse:
 
 **Keys** are not gated: `Modifier.boardShortcuts` (`classes/BoardShortcuts.kt`) works with any keyboard. `BoardShortcut`
 is the single table for mouse buttons and keys alike — each entry's `BoardTrigger` is a `MouseButton` (primary
-draws, secondary erases) or a `KeyPress` (`A` lock/unlock, `S` check, `D` undo, `F` redo) — read by the handler, the
+toggles fill/cross, secondary erase/cross) or a `KeyPress` (`A` lock/unlock, `S` check, `D` undo, `F` redo) — read by the handler, the
 dialog and the tutorial copy (`keyHint`, which formats a key or a mouse row). The mouse rows only *describe* the bindings; the gesture layer
 reads the button itself (`mouseDrawMode`). The modifier goes on each screen's root `Column`, requests focus on entry, and handles plain
 `KeyDown` events (any Ctrl/Alt/Meta chord falls through). Key events bubble from the focused node up through its

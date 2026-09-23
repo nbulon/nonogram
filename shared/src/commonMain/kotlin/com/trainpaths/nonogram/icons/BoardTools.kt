@@ -184,6 +184,30 @@ val tileToggle: ImageVector
         return _tileToggle!!
     }
 
+/** [tileToggle]'s layout with an empty tile behind — the erase/cross pair. */
+@Suppress("CheckReturnValue")
+val tileEraseToggle: ImageVector
+    get() {
+        if (_tileEraseToggle != null) return _tileEraseToggle!!
+        _tileEraseToggle = toolIcon("tile_erase_toggle", fillType = PathFillType.EvenOdd) {
+            // The empty tile's ring (8,2)-(22,16), cut back to what shows past the front tile's gap.
+            moveTo(8f, 2f)
+            horizontalLineTo(22f)
+            verticalLineTo(16f)
+            horizontalLineTo(17f)
+            verticalLineTo(14.5f)
+            horizontalLineTo(20.5f)
+            verticalLineTo(3.5f)
+            horizontalLineTo(9.5f)
+            verticalLineTo(7f)
+            horizontalLineTo(8f)
+            close()
+            squareOutline(left = 2f, top = 8f, size = 14f, thickness = 1.5f)
+            tracedCross(cx = 9f, cy = 15f, reach = 3.5f, halfWidth = 1.25f)
+        }
+        return _tileEraseToggle!!
+    }
+
 @Suppress("CheckReturnValue")
 val tileErase: ImageVector
     get() {
@@ -314,6 +338,7 @@ private var _tileFill: ImageVector? = null
 private var _tileCross: ImageVector? = null
 private var _tileToggle: ImageVector? = null
 private var _tileErase: ImageVector? = null
+private var _tileEraseToggle: ImageVector? = null
 private var _expand_content: ImageVector? = null
 
 private fun PathBuilder.cubicTo(
