@@ -42,7 +42,7 @@ internal data class FirebaseEnv(val projectId: String, val apiKey: String)
  * cannot drift from the environment the web build talks to. Both values are public client config.
  */
 internal fun readEnv(root: Path, env: String): FirebaseEnv {
-    val file = root.resolve("webApp/src/$env/kotlin/com/trainpaths/nonogram/FirebaseWebConfig.kt")
+    val file = root.resolve("webApp/src/$env/kotlin/com/trainpaths/nonogram/FirebaseConfig.web.kt")
     val text = runCatching { file.readText() }
         .getOrElse { error("no FirebaseWebConfig for env '$env' at $file") }
     fun constant(name: String) = Regex("""const val $name\s*=\s*"([^"]+)"""").find(text)?.groupValues?.get(1)
@@ -53,7 +53,7 @@ internal fun readEnv(root: Path, env: String): FirebaseEnv {
 private val json = Json { ignoreUnknownKeys = true }
 
 /**
- * Every approved puzzle, in one unpaged query — the same shape `SyncService.android.kt` uses. Filtering on
+ * Every approved puzzle, in one unpaged query — the same shape `SyncService.jvm.kt` uses. Filtering on
  * `publishStatus` alone keeps this off the `(publishStatus, updatedAt)` composite index.
  *
  * Approved documents are readable unauthenticated (the console rules say so), so the public API key is all
