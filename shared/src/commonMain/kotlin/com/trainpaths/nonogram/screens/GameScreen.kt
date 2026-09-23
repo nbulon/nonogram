@@ -1,5 +1,7 @@
 package com.trainpaths.nonogram.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -28,7 +31,6 @@ import com.trainpaths.nonogram.classes.Board
 import com.trainpaths.nonogram.classes.BoardTransformState
 import com.trainpaths.nonogram.classes.DrawMode
 import com.trainpaths.nonogram.classes.boardShortcuts
-import com.trainpaths.nonogram.classes.toSolutionInts
 import com.trainpaths.nonogram.tutorial.TutorialStep
 import com.trainpaths.nonogram.tutorial.tutorialAnchor
 
@@ -52,7 +54,14 @@ fun GameScreen(
         boardState.reset()
     }
 
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.saveCurrentProgress(pushRemote = false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { viewModel.flushProgress() }
+
+    val lift = animateFloatAsState(
+        targetValue = if (viewModel.solved) 1f else 0f,
+        animationSpec = tween(350),
+        label = "winLift",
+        finishedListener = { if (it == 1f) onWin() },
+    )
 
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     if (lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) {
@@ -76,7 +85,11 @@ fun GameScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .tutorialAnchor(TutorialStep.BOARD_AREA),
+                .tutorialAnchor(TutorialStep.BOARD_AREA)
+                .graphicsLayer {
+                    translationY = -lift.value * size.height * 0.3f
+                    alpha = 1f - lift.value
+                },
             contentAlignment = Alignment.Center,
         ) {
             if (nonogram == null) {
@@ -87,10 +100,10 @@ fun GameScreen(
                     tiles = tiles,
                     isLocked = isLocked,
                     modifier = Modifier.fillMaxSize(),
+                    isEditable = !viewModel.solved,
                     drawMode = drawMode,
                     strikeSolvedClues = true,
                     state = boardState,
-                    onTilesChanged = { if (tiles.toSolutionInts() == nonogram.solution) onWin() },
                     onEdits = viewModel::recordEdits,
                 )
             }

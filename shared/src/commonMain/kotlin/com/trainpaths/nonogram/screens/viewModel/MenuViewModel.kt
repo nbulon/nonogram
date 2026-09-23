@@ -107,6 +107,8 @@ class MenuViewModel(
 
     fun getProgress(id: Long): List<List<Int>> = progressMap[id].orEmpty()
 
+    fun hasProgress(id: Long): Boolean = getProgress(id).any { row -> row.any { it != 0 } }
+
     fun getBeatCount(id: Long): Long = beatMap[id] ?: 0
 
     fun incrementBeatCount(nonogramId: Long) {

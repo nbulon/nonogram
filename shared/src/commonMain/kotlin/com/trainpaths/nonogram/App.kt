@@ -26,9 +26,10 @@ import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.trainpaths.nonogram.auth.AuthState
+import com.trainpaths.nonogram.dialogs.ArtCardDialog
 import com.trainpaths.nonogram.dialogs.PlayConfirmDialog
-import com.trainpaths.nonogram.dialogs.WinConfirmDialog
 import com.trainpaths.nonogram.navigation.AdminRoute
+import com.trainpaths.nonogram.navigation.ArtRoute
 import com.trainpaths.nonogram.navigation.FilterRoute
 import com.trainpaths.nonogram.navigation.GameRoute
 import com.trainpaths.nonogram.navigation.GenConfRoute
@@ -40,7 +41,6 @@ import com.trainpaths.nonogram.navigation.LoginRoute
 import com.trainpaths.nonogram.navigation.MenuRoute
 import com.trainpaths.nonogram.navigation.PlayDialogRoute
 import com.trainpaths.nonogram.navigation.SettingsRoute
-import com.trainpaths.nonogram.navigation.WinDialogRoute
 import com.trainpaths.nonogram.screens.AdminScreen
 import com.trainpaths.nonogram.screens.DesktopDownloadButton
 import com.trainpaths.nonogram.screens.FilterScreen
@@ -163,6 +163,7 @@ private fun AppContent(
                                     )
                                 )
                             },
+                            onShowClick = { ng -> navController.navigate(ArtRoute(ng.id, won = false)) },
                             onGenClick = {
                                 navController.navigate(GenListRoute)
                             },
@@ -276,6 +277,7 @@ private fun AppContent(
                         PlayConfirmDialog(
                             route.difficulty,
                             menuViewModel.getBeatCount(route.nonogramId),
+                            hasProgress = menuViewModel.hasProgress(route.nonogramId),
                             onConfirm = {
                                 navController.navigate(GameRoute(route.nonogramId)) {
                                     popUpTo(MenuRoute)
@@ -309,7 +311,9 @@ private fun AppContent(
                                     menuViewModel.clearProgress(id)
                                     menuViewModel.incrementBeatCount(id)
                                 }
-                                navController.navigate(WinDialogRoute)
+                                viewModel.currentNonogramId?.let { id ->
+                                    navController.navigate(ArtRoute(id, won = true))
+                                }
                             },
                             onSwapMode = {
                                 viewModel.saveCurrentProgress()
@@ -322,9 +326,17 @@ private fun AppContent(
                             },
                         )
                     }
-                    dialog<WinDialogRoute> {
-                        WinConfirmDialog(
-                            onConfirm = {
+                    dialog<ArtRoute> { entry ->
+                        val route: ArtRoute = entry.toRoute()
+                        val nonogram = menuViewModel.nonograms.firstOrNull { it.id == route.nonogramId }
+                        if (nonogram == null) {
+                            LaunchedEffect(Unit) { navController.popBackStack() }
+                            return@dialog
+                        }
+                        ArtCardDialog(
+                            nonogram = nonogram,
+                            won = route.won,
+                            onHome = {
                                 navController.navigate(MenuRoute) {
                                     popUpTo(MenuRoute) { inclusive = true }
                                 }
@@ -333,6 +345,7 @@ private fun AppContent(
                                 onResetBoard?.invoke()
                                 navController.popBackStack()
                             },
+                            onClose = { navController.popBackStack() },
                         )
                     }
                     composable<SettingsRoute> {

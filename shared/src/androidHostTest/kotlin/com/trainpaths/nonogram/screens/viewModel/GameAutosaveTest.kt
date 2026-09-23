@@ -24,8 +24,10 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Leaving the app used to lose the board, so the board is written out every few changes. The count
@@ -88,14 +90,16 @@ class GameAutosaveTest {
     private fun GameViewModel.strokeAlmostToTheInterval() =
         repeat(AUTOSAVE_STROKE_INTERVAL - 1) { stroke(it) }
 
-    /** Fills the board in exactly, the way the last stroke of a real win does. */
-    private fun GameViewModel.solve() {
+    /** Draws every solution cell but the last uncommitted, then commits the last as the winning stroke. */
+    private fun GameViewModel.solveWithLastStroke() {
         val solution = assertNotNull(nonogram).solution
-        for ((row, values) in solution.withIndex()) {
-            for ((col, value) in values.withIndex()) {
-                tiles[row][col].state = if (value == 1) TileState.FILLED else TileState.NONE
-            }
+        val cells = solution.indices.flatMap { row ->
+            solution[row].indices.filter { solution[row][it] == 1 }.map { col -> row * nonogram!!.width + col }
         }
+        for (index in cells.dropLast(1)) {
+            tiles[index / nonogram!!.width][index % nonogram!!.width].state = TileState.FILLED
+        }
+        stroke(cells.last())
     }
 
     @Test
@@ -150,18 +154,53 @@ class GameAutosaveTest {
     }
 
     @Test
-    fun aBeatenPuzzleSurvivesTheFlushThatFollowsIt() = runTest(dispatcher) {
+    fun theWinningStrokeLeavesNothingForTheFlushToWrite() = runTest(dispatcher) {
         val viewModel = loadedViewModel()
-        viewModel.solve()
+        viewModel.solveWithLastStroke()
+        assertTrue(viewModel.solved)
 
         viewModel.saveCurrentProgress(win = true)
         viewModel.awaitIdle()
 
-        // Leaving the win dialog destroys the destination, and that flushes.
-        viewModel.saveCurrentProgress(pushRemote = false)
+        // Leaving the win card destroys the game destination, and that flushes.
+        viewModel.flushProgress()
         viewModel.awaitIdle()
 
-        assertNull(sdk.getSingleProgress(uid, puzzleId)?.boardState)
+        val row = assertNotNull(sdk.getSingleProgress(uid, puzzleId))
+        assertNull(row.boardState)
+    }
+
+    @Test
+    fun aFlushWithNothingChangedWritesNothing() = runTest(dispatcher) {
+        val viewModel = loadedViewModel()
+
+        viewModel.flushProgress()
+        viewModel.awaitIdle()
+
+        assertNull(sdk.getSingleProgress(uid, puzzleId))
+    }
+
+    @Test
+    fun aFlushAfterAStrokeWrites() = runTest(dispatcher) {
+        val viewModel = loadedViewModel()
+        viewModel.stroke(0)
+
+        viewModel.flushProgress()
+        viewModel.awaitIdle()
+
+        assertNotNull(sdk.getSingleProgress(uid, puzzleId)?.boardState)
+    }
+
+    @Test
+    fun solvedFollowsUndoAndRedo() = runTest(dispatcher) {
+        val viewModel = loadedViewModel()
+        viewModel.solveWithLastStroke()
+
+        viewModel.history.undo()
+        assertFalse(viewModel.solved)
+
+        viewModel.history.redo()
+        assertTrue(viewModel.solved)
     }
 }
 
