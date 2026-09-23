@@ -129,7 +129,7 @@ initialize Koin DI and host the Compose UI.
   Put new merge or mapping rules in commonMain and let both platforms call them.
 - **`classes/` board + game** — the interactive grid (clues, tiles, pan/zoom, drag-to-draw) is a self-contained Compose
   engine: `Board`/`BoardTransform` (one Canvas for all tiles + a layer-transform pan/zoom model),
-  `Game` (win check), `Tile`/`TileState`, `ClueProgress` (which clues the player has certainly drawn, struck out in the
+  `Tile`/`TileState`, `ClueProgress` (which clues the player has certainly drawn, struck out in the
   game screen's gutters), and `RezoomButton` — fit-to-screen, floating over the board's top-left on a translucent scrim
   and shown only while the board is zoomed in (`BoardTransformState.canReset`). Performance-critical and gesture-heavy —
   see `docs/board-rendering.md`.
@@ -166,7 +166,9 @@ initialize Koin DI and host the Compose UI.
   `FirebaseWeb.signInWithGoogle`, because the web sync gate reads the Firebase JS SDK's auth state (see
   `docs/web-architecture.md`). Both skip `KMPAuthUserCancelledException` rather than logging a dismissed prompt.
 - **ViewModels** (`screens/viewModel/`) — Compose state holders using `mutableStateOf`. `GameViewModel` manages the tile
-  board and save/sync. `GenViewModel` drives the generator (draw/resize/save + validation). `MenuViewModel` holds the
+  board and save/sync, and detects the win (`solved`) when a stroke, undo or redo is committed — never mid-drag.
+  It autosaves locally every `AUTOSAVE_STROKE_INTERVAL` changes; `flushProgress` (the game screen's ON_STOP) writes
+  only if something changed since the last save, which is what keeps it from undoing a win's NULL board. `GenViewModel` drives the generator (draw/resize/save + validation). `MenuViewModel` holds the
   nonogram list and progress preview map; it loads via `AppSDK.getVisibleNonograms(uid)` — approved puzzles plus
   whatever the current user key owns — so a signed-out user stops seeing the previous account's puzzles (the rows stay
   in the DB, they are just filtered out). `AuthViewModel` orchestrates login flow and **all remote sync** —
@@ -216,8 +218,10 @@ initialize Koin DI and host the Compose UI.
 Type-safe navigation via `navigation-compose` with `@Serializable` route objects in `navigation/Routes.kt`. Routes:
 `LoginRoute`, `MenuRoute`, `GameRoute(nonogramId)`, `SettingsRoute`, `AdminRoute`, plus the generator routes
 `GenListRoute`,
-`GenConfRoute(editing)`, `GeneratorRoute` (the board editor), plus dialog routes (`PlayDialogRoute`, `WinDialogRoute`,
-`LeaveDialogRoute`).
+`GenConfRoute(editing)`, `GeneratorRoute` (the board editor), plus dialog routes: `PlayDialogRoute` (titled "Continue?" when the
+puzzle has saved progress) and `ArtRoute(nonogramId, won)` — `dialogs/ArtCardDialog`, the solution drawn as a picture
+on a card. A win opens it with `won = true` (Home / Restart, and the board's art rising into the card after
+`GameScreen` lifts the board off); a beaten menu card's Show button opens it with `won = false`.
 
 **Generator flow.** `GenConfRoute` is *linked to a specific `GeneratorRoute`* via its `editing` flag:
 

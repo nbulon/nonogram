@@ -35,8 +35,12 @@ class GameViewModel(
     var tiles: List<List<Tile>> by mutableStateOf(emptyList())
         private set
 
+    /** Whether the last committed change left the board matching the solution; the screen plays the win from it. */
+    var solved: Boolean by mutableStateOf(false)
+        private set
+
     /** [BoardHistory.onApply] fires on undo/redo, which move the board as much as a stroke does. */
-    val history = BoardHistory(onApply = { noteBoardChange() })
+    val history = BoardHistory(onApply = { afterBoardChange() })
 
     private var changesSinceSave = 0
     private var saveJob: Job? = null
@@ -47,13 +51,11 @@ class GameViewModel(
     val currentProgress: List<List<Int>>
         get() = tiles.toProgressInts()
 
-    private val isSolved: Boolean
-        get() = nonogram?.let { tiles.toSolutionInts() == it.solution } == true
-
     fun loadNonogram(id: Long) {
         nonogram = null
         tiles = emptyList()
         changesSinceSave = 0
+        solved = false
         launchGuarded(onError = { println("Game: loading nonogram $id failed: ${it.message}") }) {
             val loaded: Nonogram? = sdk.getNonogramById(id)
             if (loaded != null) {
@@ -79,17 +81,24 @@ class GameViewModel(
     fun recordEdits(edits: List<TileEdit>) {
         if (edits.isEmpty()) return
         history.record(edits)
-        noteBoardChange()
+        afterBoardChange()
     }
 
-    private fun noteBoardChange() {
+    private fun afterBoardChange() {
+        solved = nonogram?.solution == tiles.toSolutionInts()
+        if (solved) return
         if (++changesSinceSave < AUTOSAVE_STROKE_INTERVAL) return
+        saveCurrentProgress(pushRemote = false)
+    }
+
+    /** Saves locally only if something changed since the last save. */
+    fun flushProgress() {
+        if (changesSinceSave == 0) return
         saveCurrentProgress(pushRemote = false)
     }
 
     /** Writes the board out, and resets the autosave counter. [pushRemote] is off for autosaves */
     fun saveCurrentProgress(win: Boolean = false, pushRemote: Boolean = true) {
-        if (!win && isSolved) return
         changesSinceSave = 0
         val userUid = authRepository.currentUserUid.value.orMissing() ?: return
         val nonogramId = nonogram?.id ?: return
@@ -146,5 +155,6 @@ class GameViewModel(
         }
         history.record(edits)
         changesSinceSave = 0
+        solved = false
     }
 }

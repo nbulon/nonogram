@@ -6,10 +6,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 
 @Composable
-fun PlayConfirmDialog(difficulty: String, beatCount: Long, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+fun PlayConfirmDialog(
+    difficulty: String,
+    beatCount: Long,
+    hasProgress: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Play?") },
+        title = { Text(if (hasProgress) "Continue?" else "Play?") },
         text = { Text("Difficulty: ${difficulty.lowercase()}\nBeaten: ${beatCount}x") },
 
         confirmButton = {
