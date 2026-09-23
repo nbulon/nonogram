@@ -14,7 +14,7 @@ class SettingsRepository(private val settings: Settings) {
     private val _theme = MutableStateFlow(ColorTheme.fromKey(settings.getStringOrNull(KEY_THEME)))
     val theme: StateFlow<ColorTheme> = _theme.asStateFlow()
 
-    private val _showNames = MutableStateFlow(settings.getBoolean(KEY_SHOW_ALL_NAMES, true))
+    private val _showNames = MutableStateFlow(settings.getBoolean(KEY_SHOW_ALL_NAMES, false))
     val showNames: StateFlow<Boolean> = _showNames.asStateFlow()
 
     fun setTheme(theme: ColorTheme) {

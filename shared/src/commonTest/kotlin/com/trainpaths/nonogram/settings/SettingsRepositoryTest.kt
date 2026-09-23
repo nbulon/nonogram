@@ -4,6 +4,7 @@ import com.russhwolf.settings.MapSettings
 import com.trainpaths.nonogram.ColorTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SettingsRepositoryTest {
@@ -33,18 +34,18 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun noSavedPreference_showAllNamesDefaultsToTrue() {
+    fun noSavedPreference_showAllNamesDefaultsToFalse() {
         val repo = SettingsRepository(MapSettings())
-        assertTrue(repo.showNames.value)
+        assertFalse(repo.showNames.value)
     }
 
     @Test
     fun setShowAllNames_persistsAcrossRepositoryInstances() {
         val settings = MapSettings()
-        SettingsRepository(settings).setShowAllNames(false)
+        SettingsRepository(settings).setShowAllNames(true)
 
         val restored = SettingsRepository(settings)
-        assertEquals(false, restored.showNames.value)
+        assertTrue(restored.showNames.value)
         assertEquals(ColorTheme.DEFAULT, restored.theme.value)
     }
 }

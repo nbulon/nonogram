@@ -103,8 +103,8 @@ initialize Koin DI and host the Compose UI.
   the first one's data. `signOut()` mints a fresh guest key and leaves the signed-in row intact, so signing back in
   restores that account's puzzles and progress.
 - **`settings/SettingsRepository`** — holds the app's persisted preferences via `multiplatform-settings`: the selected
-  `ColorTheme` (key `color_theme`, stores the enum name) and `showNames` (key `show_all_nonogram_names`, default
-  `true` — the Settings screen's "Always show names" switch, read by `MenuViewModel`). Same shape as `AuthRepository`:
+  `ColorTheme` (key `color_theme`, stores the enum name) and `showNames` (key `show_names`, default
+  `false` — the Settings screen's "Always show names" switch, read by `MenuViewModel`). Same shape as `AuthRepository`:
   reads synchronously in the constructor (no `initialize()` needed), exposes a `StateFlow` per preference, writes
   through on set. See **AppTheme** below.
 - **`sync/SyncService`** — interface for syncing *both* progress and the shared `nonograms` collection (push/pull/merge;
