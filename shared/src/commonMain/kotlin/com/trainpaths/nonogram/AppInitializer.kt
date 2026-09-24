@@ -6,7 +6,7 @@ import com.trainpaths.nonogram.auth.AuthRepository
 import kotlinx.coroutines.CancellationException
 
 object AppInitializer {
-    const val OAUTH_REDIRECT_URI = "http://localhost:56789/callback"
+    const val OAUTH_REDIRECT_URI = "http://localhost:42594/callback"
 
     fun onApplicationStart(googleWebClientId: String) {
         KMPAuth.initialize {
