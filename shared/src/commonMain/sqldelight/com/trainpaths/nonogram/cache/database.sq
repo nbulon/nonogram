@@ -103,12 +103,11 @@ WHERE UserProgress.userUid = ?;
 mergeProgressInto:
 INSERT OR REPLACE INTO UserProgress(userUid, nonogramId, boardState, updatedAt, beat)
 SELECT :toUid, src.nonogramId, src.boardState, src.updatedAt,
-       max(src.beat, COALESCE((SELECT dst.beat FROM UserProgress dst
-                               WHERE dst.userUid = :toUid AND dst.nonogramId = src.nonogramId), 0))
+       max(src.beat, COALESCE(dst.beat, 0))
 FROM UserProgress src
+LEFT JOIN UserProgress dst ON dst.userUid = :toUid AND dst.nonogramId = src.nonogramId
 WHERE src.userUid = :fromUid
-  AND src.updatedAt > COALESCE((SELECT dst.updatedAt FROM UserProgress dst
-                                WHERE dst.userUid = :toUid AND dst.nonogramId = src.nonogramId), 0);
+  AND src.updatedAt > COALESCE(dst.updatedAt, 0);
 
 deleteProgressFor:
 DELETE FROM UserProgress WHERE userUid = :uid;
