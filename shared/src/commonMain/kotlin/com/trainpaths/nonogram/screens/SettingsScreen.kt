@@ -51,6 +51,8 @@ import com.trainpaths.nonogram.tutorial.TutorialRepository
 import com.trainpaths.nonogram.tutorial.TutorialStep
 import com.trainpaths.nonogram.tutorial.tutorialAnchor
 import com.trainpaths.nonogram.auth.AuthState
+import androidx.compose.foundation.layout.windowInsetsPadding
+import com.trainpaths.nonogram.bodyInsets
 
 private val SETTINGS_BUTTON_HEIGHT = 42.dp
 private val SETTINGS_ITEM_GAP = 16.dp
@@ -93,7 +95,7 @@ fun SettingsScreen(
             backArrow = true,
         )
         Column(
-            modifier = Modifier.fillMaxHeight().width(310.dp).padding(10.dp),
+            modifier = Modifier.windowInsetsPadding(bodyInsets).fillMaxHeight().width(310.dp).padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
         ) {
             Column(

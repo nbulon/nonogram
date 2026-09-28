@@ -32,6 +32,8 @@ import com.trainpaths.nonogram.navigation.TopAppBar
 import com.trainpaths.nonogram.MAX_CONTENT_WIDTH
 import com.trainpaths.nonogram.outlinedFieldColors
 import com.trainpaths.nonogram.screens.viewModel.AdminViewModel
+import androidx.compose.foundation.layout.windowInsetsPadding
+import com.trainpaths.nonogram.bodyInsets
 
 @Composable
 fun AdminScreen(
@@ -78,7 +80,7 @@ fun AdminScreen(
 private fun ReviewCard(nonogram: Nonogram, adminViewModel: AdminViewModel) {
     val isDeciding = adminViewModel.isDeciding
     Column(
-        modifier = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxSize().padding(16.dp),
+        modifier = Modifier.widthIn(max = MAX_CONTENT_WIDTH).fillMaxSize().windowInsetsPadding(bodyInsets).padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {

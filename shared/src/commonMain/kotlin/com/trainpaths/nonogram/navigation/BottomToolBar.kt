@@ -7,6 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -82,6 +88,8 @@ fun BottomToolBar(
             containerColor = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSecondary,
             contentPadding = PaddingValues(horizontal = 4.dp),
+            windowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
+                .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
         ) {
             val showPencil = !hasMouseAndKeyboard
             val iconOnlyCount = (if (showPencil) DrawMode.entries.size else 0) +

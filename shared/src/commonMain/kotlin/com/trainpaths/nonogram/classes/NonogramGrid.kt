@@ -34,6 +34,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.trainpaths.nonogram.color
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.asPaddingValues
+import com.trainpaths.nonogram.bodyInsets
 
 private val MIN_CARD_WIDTH = 220.dp
 
@@ -56,7 +60,7 @@ fun NonogramGrid(
         LazyVerticalGrid(
             columns = GridCells.Fixed((maxWidth / MIN_CARD_WIDTH).toInt().coerceAtLeast(2)),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(12.dp),
+            contentPadding = bodyInsets.add(WindowInsets(12.dp, 12.dp, 12.dp, 12.dp)).asPaddingValues(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             content = content,

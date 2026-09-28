@@ -22,6 +22,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.trainpaths.nonogram.classes.Difficulty
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 
 /**
  * Widest the app's content ever gets.
@@ -29,6 +33,10 @@ import com.trainpaths.nonogram.classes.Difficulty
  * and center from the parent Column's `horizontalAlignment`.
  */
 val MAX_CONTENT_WIDTH = 1000.dp
+
+/** What content below the TopAppBar keeps clear of in Android's edge-to-edge window: nav bar, side cutouts, keyboard. */
+val bodyInsets: WindowInsets
+    @Composable get() = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
 
 /**
  * Corner rounding for the app's buttons — card-like. Pass as `shape = BUTTON_SHAPE`.

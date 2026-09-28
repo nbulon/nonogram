@@ -28,6 +28,10 @@ import com.trainpaths.nonogram.icons.indeterminate_question_box
 import com.trainpaths.nonogram.icons.settings
 import com.trainpaths.nonogram.tutorial.TutorialStep
 import com.trainpaths.nonogram.tutorial.tutorialAnchor
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 
 val LocalNavController = staticCompositionLocalOf<NavController> {
     error("No NavController provided")
@@ -109,6 +113,7 @@ fun TopAppBar(
                     }
                 }
             },
+            windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = Color.Transparent,
                 scrolledContainerColor = Color.Unspecified,

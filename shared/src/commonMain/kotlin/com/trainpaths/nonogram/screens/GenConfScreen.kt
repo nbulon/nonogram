@@ -51,6 +51,8 @@ import com.trainpaths.nonogram.screens.viewModel.GenViewModel
 import com.trainpaths.nonogram.screens.viewModel.ValidationState
 import com.trainpaths.nonogram.tutorial.TutorialStep
 import com.trainpaths.nonogram.tutorial.tutorialAnchor
+import androidx.compose.foundation.layout.windowInsetsPadding
+import com.trainpaths.nonogram.bodyInsets
 
 /**
  * Digits the size fields accept \u2014 as many as [MAX_NONOGRAM_SIDE] needs, so a number too long to
@@ -89,7 +91,7 @@ fun GenConfScreen(
         )
 
         Column(
-            modifier = Modifier.fillMaxHeight().width(260.dp),
+            modifier = Modifier.windowInsetsPadding(bodyInsets).fillMaxHeight().width(260.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
