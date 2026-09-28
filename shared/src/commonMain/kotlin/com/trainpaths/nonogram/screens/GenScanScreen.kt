@@ -36,6 +36,8 @@ import com.trainpaths.nonogram.screens.viewModel.GenViewModel
 import com.trainpaths.nonogram.screens.viewModel.ScanViewModel
 import com.trainpaths.nonogram.switchColors
 import kotlin.math.min
+import androidx.compose.foundation.layout.windowInsetsPadding
+import com.trainpaths.nonogram.bodyInsets
 
 /** How tall the preview is allowed to be, whatever the grid's aspect ratio. */
 private val PREVIEW_HEIGHT = 300.dp
@@ -76,6 +78,7 @@ fun GenScanScreen(
             modifier = Modifier
                 .widthIn(max = MAX_CONTENT_WIDTH)
                 .fillMaxSize()
+                .windowInsetsPadding(bodyInsets)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

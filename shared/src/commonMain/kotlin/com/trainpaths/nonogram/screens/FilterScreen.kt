@@ -43,6 +43,8 @@ import com.trainpaths.nonogram.icons.reset_settings
 import com.trainpaths.nonogram.navigation.TopAppBar
 import com.trainpaths.nonogram.outlinedFieldColors
 import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.windowInsetsPadding
+import com.trainpaths.nonogram.bodyInsets
 
 /**
  * The dropdown's "More" page: a name search and a min–max bound on the puzzle's longer side. Every
@@ -75,7 +77,7 @@ fun FilterScreen(
         )
 
         Column(
-            modifier = Modifier.fillMaxHeight().width(260.dp),
+            modifier = Modifier.windowInsetsPadding(bodyInsets).fillMaxHeight().width(260.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
