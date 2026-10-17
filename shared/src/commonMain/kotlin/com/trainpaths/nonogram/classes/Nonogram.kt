@@ -45,6 +45,13 @@ fun List<List<Int>>.isRectangularGrid(): Boolean {
     return width > 0 && all { it.size == width }
 }
 
+/**
+ * Every cell is 0 or 1 - the puzzle-solution encoding, as opposed to a saved board's 0/1/2.
+ * [computeLineClues] counts only `1`, and the win check compares against a 0/1 projection of the
+ * player's tiles, so a cell outside that range would yield a puzzle no one can ever finish.
+ */
+fun List<List<Int>>.isBinaryGrid(): Boolean = all { row -> row.all { it == 0 || it == 1 } }
+
 /** [isRectangularGrid], with both sides inside [MIN_NONOGRAM_SIDE]..[MAX_NONOGRAM_SIDE]. */
 fun List<List<Int>>.isWellFormedGrid(): Boolean =
     isRectangularGrid() &&
