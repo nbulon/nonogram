@@ -148,7 +148,7 @@ initialize Koin DI and host the Compose UI.
   `label` is also its id. `FilterSortState` also carries the two filters the dropdown's closing "More" row opens
   `FilterScreen` for (`FilterRoute(generator)`, a flag so `App.kt` binds the right ViewModel):
   `query`, a case-insensitive name search that drops unnamed puzzles while non-blank, and `sizeRange`, a bound on
-  `Nonogram.longerSide` edited through text fields and a `RangeSlider` (`withMinSize`/`withMaxSize` keep the ends
+  `Nonogram.longSide` edited through text fields and a `RangeSlider` (`withMinSize`/`withMaxSize` keep the ends
   ordered and inside `FULL_SIZE_RANGE`). The screen applies every edit live, so back just pops. With no sort chosen the
   menu lists own puzzles first and the generator lists latest-updated first.
 - **`tutorial/`** — the first-run hint overlay: `TutorialStep` (an enum whose declaration order is priority order,
@@ -308,14 +308,16 @@ silently disappears. Icons come from the hand-built `icons/` package of `ImageVe
   `isPublic get() = publishStatus == APPROVED`, and the author's on/off switch moves an approved puzzle between APPROVED
   and UNLISTED. Computes `rowClues`/`colClues` on the fly, and `isValid` lazily via the `Solver`. Name helpers live
   alongside: `MAX_NONOGRAM_NAME_LENGTH` (30), `normalizeNonogramName()`, `UNNAMED_NONOGRAM_TITLE`, and
-  `nonogramNameProblem()` — the client-side name gate (emoji/symbols, plus the substring blocklist in
+  `nameControl()` — the client-side name gate (emoji/symbols, plus the substring blocklist in
   `classes/NameBlocklist.kt`), returning the message to show or null; a blank name is always fine. The shared
   `NameField` (`screens/GenConfScreen.kt`) renders it as the field's error, and `GenViewModel.requestPublish` and
   `AdminViewModel.accept` refuse a name it rejects. Ownership is
   `isOwned(uid)`, which never matches the blank `authorUid` seeded puzzles carry. Grid shape lives here too:
   `MIN_NONOGRAM_SIDE` (5) / `MAX_NONOGRAM_SIDE` (60), clamped in `GenViewModel.setNonogram`/`resizeNonogram` and shown
-  in `GenConfScreen`'s size fields, plus `isRectangularGrid()` / `isWellFormedGrid()`. Both sync services reject a grid
-  failing `isWellFormedGrid()` in `parseNonograms` (ragged grids crash `colClues`), and the DB mapper falls back to an
+  in `GenConfScreen`'s size fields, plus `isRectangularGrid()` / `isWellFormedGrid()` / `isBinaryGrid()`. Both sync
+  services reject a grid failing `isWellFormedGrid()` or `isBinaryGrid()` in `toNonogram` (ragged grids crash
+  `colClues`; a cell that is neither 0 nor 1 makes the puzzle unwinnable, since `computeLineClues` counts only `1` and
+  the win check compares against a 0/1 projection of the tiles), and the DB mapper falls back to an
   empty solution for one already stored — keep `MAX_NONOGRAM_SIDE` in step with the 20 000-character cap the Firestore
   rules put on the encoded `solution`.
 - **`Tile`** — mutable Compose state. Cycles: NONE → FILLED → CROSSED → NONE.
