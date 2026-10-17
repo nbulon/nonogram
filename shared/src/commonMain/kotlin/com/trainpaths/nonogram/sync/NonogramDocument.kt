@@ -1,6 +1,7 @@
 package com.trainpaths.nonogram.sync
 
 import com.trainpaths.nonogram.classes.Nonogram
+import com.trainpaths.nonogram.classes.isBinaryGrid
 import com.trainpaths.nonogram.classes.isWellFormedGrid
 import com.trainpaths.nonogram.classes.normalizeNonogramName
 import com.trainpaths.nonogram.classes.toSolutionOrNull
@@ -33,6 +34,7 @@ internal fun NonogramDocument.toNonogram(onSkip: (String) -> Unit): Nonogram? {
     val grid = encoded.toSolutionOrNull { decodeError = it }
         ?: return skip(onSkip, "unreadable solution: $decodeError")
     if (!grid.isWellFormedGrid()) return skip(onSkip, "grid out of range or ragged")
+    if (!grid.isBinaryGrid()) return skip(onSkip, "grid holds cells that are neither 0 nor 1")
     return Nonogram(
         id = nonogramId,
         difficulty = difficulty.toDifficulty(),

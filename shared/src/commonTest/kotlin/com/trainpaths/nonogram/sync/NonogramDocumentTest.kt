@@ -110,6 +110,17 @@ class NonogramDocumentTest {
     }
 
     @Test
+    fun skipsGridsWithCellsOutsideZeroAndOne() {
+        val crossed = List(5) { row -> List(5) { col -> if (row == col) 2 else 0 } }
+        val negative = List(5) { List(5) { -1 } }
+
+        assertNull(document(solution = crossed.toSolutionJson()).parse())
+        assertNull(document(solution = negative.toSolutionJson()).parse())
+
+        assertEquals(2, skipped.size)
+    }
+
+    @Test
     fun skipsGridsThatAreNotWellFormed() {
         val ragged = listOf(listOf(1, 0, 0, 0, 0)) + List(4) { listOf(0, 0, 0, 0) }
         val tooBig = List(MAX_NONOGRAM_SIDE + 1) { List(MAX_NONOGRAM_SIDE + 1) { 0 } }
