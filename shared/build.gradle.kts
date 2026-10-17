@@ -116,7 +116,6 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.sqldelight.runtime)
             implementation(libs.sqldelight.async.extensions)
-            implementation(libs.kotlinx.datetime)
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.koin.core)
             implementation(libs.koin.core.viewmodel)
@@ -137,7 +136,7 @@ kotlin {
         webMain.dependencies {
             implementation(libs.kotlinx.browser)
             implementation(libs.sqldelight.web.worker.driver)
-            implementation(npm("firebase", "12.13.0"))
+            implementation(npm("firebase", "13.0.0"))
         }
     }
 }
