@@ -1,0 +1,31 @@
+# Normalize every text file to LF in the repository. The working tree keeps the
+# platform's own convention, so a Windows checkout is CRLF without that showing
+# up as a diff against the LF blobs in the index.
+* text=auto
+
+# Must be LF in the working tree too, whatever the platform:
+# gradlew is run through sh (git-bash/WSL), where a CR makes it die with
+# "gradlew: 2: : not found"; the rest are read by Linux containers and CI.
+gradlew           text eol=lf
+*.sh              text eol=lf
+Dockerfile        text eol=lf
+*.conf            text eol=lf
+*.yml             text eol=lf
+*.yaml            text eol=lf
+.dockerignore     text eol=lf
+
+# Windows-only scripts
+*.bat             text eol=crlf
+*.cmd             text eol=crlf
+
+# Never touched
+*.jks             binary
+*.keystore        binary
+*.png             binary
+*.ico             binary
+*.icns            binary
+*.jpg             binary
+*.webp            binary
+*.wasm            binary
+*.ttf             binary
+*.otf             binary
