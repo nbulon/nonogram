@@ -177,7 +177,7 @@ Two build steps, in two places:
 
    The split — `compileProductionExecutableKotlinWasmJs`, then `wasmJsBrowserDistribution` — exists so the compile JVM
    has exited before the native `wasm-opt` runs, rather than the two sitting on the runner's memory at once. It is also
-   why the two steps get different heaps: 1380 MB with 300 MB metaspace and a 128 MB code cache for the Kotlin compile
+   why the two steps get different heaps: 1380 MB with 400 MB metaspace and a 128 MB code cache for the Kotlin compile
    (serial GC that hands heap back, compiler in-process), then 640 MB with 256 MB metaspace for the bundling step,
    alongside a 580 MB `NODE_OPTIONS` heap for webpack. Both run `--no-daemon --no-parallel
    --max-workers=1`, because the `gradle.properties` defaults (4 GB Gradle JVM, 3 GB Kotlin daemon, daemons that outlive
@@ -185,8 +185,9 @@ Two build steps, in two places:
 
    Each step also writes `1000` to its own `/proc/self/oom_score_adj`: if the machine does run out of memory, the
    kernel's OOM killer takes the build first instead of whatever else the runner is hosting. A failed build is cheaper
-   than a killed neighbour. On an out-of-memory failure raise `-Xmx` first (a Kotlin compile
-   `OutOfMemoryError`), `NODE_OPTIONS` second (a webpack "heap out of memory").
+   than a killed neighbour. On an out-of-memory failure, raise the limit that ran out: `-Xmx` for a Kotlin compile
+   `OutOfMemoryError: Java heap space`, `-XX:MaxMetaspaceSize` for `OutOfMemoryError: Metaspace` (300 MB was too little
+   once the compiler and all plugins are loaded in one JVM), `NODE_OPTIONS` for a webpack "heap out of memory".
 2. **The image is built on the webhost.** The runner packs the release — the `Dockerfile`, `nginx.conf`,
    `.dockerignore` and the wasmJs dist folder — into a tarball and hands it to the webhost over SSH, tagged with the
    commit sha. The webhost does the rest on its own side: unpacking, building the image, restarting the container and
