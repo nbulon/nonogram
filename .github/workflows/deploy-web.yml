@@ -59,11 +59,10 @@ jobs:
             --no-daemon --no-parallel --max-workers=1 \
             -Dorg.gradle.jvmargs="-Xmx640m -XX:MaxMetaspaceSize=256m -XX:+UseSerialGC -Dfile.encoding=UTF-8"
 
-      - name: Build image on the host and restart the container
+      - name: Upload release and deploy on the webhost
         env:
-          DOCKER_HOST: ssh://${{ vars.SSH_TARGET }}
-          WEB_PORT: ${{ vars.WEB_PORT || '8080' }}
-          IMAGE_TAG: ${{ github.sha }}
+          SHA: ${{ github.sha }}
+          SSH_TARGET: ${{ vars.SSH_TARGET }}
         run: |
-          docker compose --project-name nonogram-web -f webApp/compose.yml up -d --build --remove-orphans
-          docker image prune -f
+          tar -C webApp -czf - compose.yml Dockerfile nginx.conf .dockerignore build/dist/wasmJs/productionExecutable \
+            | ssh "$SSH_TARGET" "$SHA"

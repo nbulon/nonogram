@@ -1,5 +1,5 @@
-# Whitelist: only what the image copies, so the build context sent over SSH stays small
+# Whitelist: only what the image copies. Source maps never ship, at any depth
 *
 !nginx.conf
 !build/dist/wasmJs/productionExecutable/**
-build/dist/**/*.map
+**/*.map
