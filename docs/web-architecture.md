@@ -152,7 +152,7 @@ constant added to one must be added to the other; see `docs/prod-firebase-setup.
   servers on different ports are different origins with separate indexedDB sessions).
   `main.kt` calls `FirebaseWeb.initialize(...)` and `AppInitializer.onApplicationStart(clientId)` before Koin.
 
-## Deploy (GitHub Actions + Docker over SSH)
+## Deploy (GitHub Actions + release upload over SSH)
 
 `.github/workflows/deploy-web.yml` builds the prod web bundles on the self-hosted runner and deploys them to the webhost
 as an nginx container. Every push to `main` deploys; `workflow_dispatch` reruns it by hand.
@@ -187,17 +187,18 @@ Two build steps, in two places:
    kernel's OOM killer takes the build first instead of whatever else the runner is hosting. A failed build is cheaper
    than a killed neighbour. On an out-of-memory failure raise `-Xmx` first (a Kotlin compile
    `OutOfMemoryError`), `NODE_OPTIONS` second (a webpack "heap out of memory").
-2. **The image is built on the host.** The deploy step sets `DOCKER_HOST=ssh://<user>@<host>` and runs
-   `docker compose -f webApp/compose.yml up -d --build`. The Docker CLI streams the build context to the host's daemon
-   over SSH, the image is built and started there, and nothing is pushed to a registry. `webApp/.dockerignore` is a
-   whitelist, so the context is just the two conf files and the wasmJs dist folder (source maps excluded). Because
-   that whitelist un-ignores the **whole** dist tree and the runner checks out with `clean: false`, the deploy purges
-   `webApp/build/dist` before compiling — otherwise a file left there by an earlier run would be published at the
-   site's root.
+2. **The image is built on the webhost.** The runner packs the release — the `Dockerfile`, `nginx.conf`,
+   `.dockerignore` and the wasmJs dist folder — into a tarball and hands it to the webhost over SSH, tagged with the
+   commit sha. The webhost does the rest on its own side: unpacking, building the image, restarting the container and
+   cleaning up old images, configured by its own compose file and `.env`. Nothing is pushed to a registry, and the
+   runner needs no Docker. `webApp/.dockerignore` is a whitelist, so the image gets just the conf file and the dist
+   folder, with source maps (`**/*.map`) excluded at any depth. Because that whitelist un-ignores the **whole** dist
+   tree and the runner checks out with `clean: false`, the deploy purges `webApp/build/dist` before compiling —
+   otherwise a file left there by an earlier run would be published at the site's root.
 
 The files: `webApp/Dockerfile`, `webApp/nginx.conf`, `webApp/security-headers.conf`, `webApp/compose.yml`,
 `webApp/.dockerignore`. **The `.dockerignore` is a whitelist — a new file next to the `Dockerfile` is invisible to the
-build until it is un-ignored there.**
+build until it is un-ignored there** — and the release tarball only carries the files the deploy packs.
 
 ### Rootless, and why the port is 8080
 
@@ -207,13 +208,11 @@ bind port 80; a static file server has no other need for it. The unprivileged im
 `no-new-privileges`, and mount the root filesystem `read_only`. Read-only works because that image's `nginx.conf`
 writes its pid to `/tmp`; the only writable mounts are `tmpfs` at `/tmp` and `/var/cache/nginx`.
 
-Only the *container* port moved. `WEB_PORT` still controls the host side and the publish is still loopback-only, so
-the reverse proxy is unaffected.
+Only the *container* port moved. The host port is set in the webhost's `.env` and the publish is still loopback-only,
+so the reverse proxy is unaffected.
 
-`image:` carries `${IMAGE_TAG:-latest}`, and the workflow passes the commit sha. That is the rollback handle:
-`IMAGE_TAG=<older-sha> docker compose --project-name nonogram-web -f webApp/compose.yml up -d` on the host. Tagged
-images survive the deploy's `docker image prune -f` (it removes dangling images only), so they accumulate — that is
-the trade for being able to roll back.
+Every release is tagged with its commit sha. Rollback, image tags and cleanup are the webhost's business, not the
+repo's.
 
 ### Headers
 
@@ -254,14 +253,14 @@ OPFS needs a secure context, so the site must be reached over `https://`.
 
 #### Runner machine
 
-- Docker CLI (with the compose plugin) installed; the runner's user can run `docker`.
-- SSH key for `<user>@<host>` in the runner user's `~/.ssh`, and the host's key already in `known_hosts`
-  (`ssh <user>@<host> docker info` must work non-interactively as the runner's user).
+- SSH key for `<user>@<host>` in the runner user's `~/.ssh`, and the host's key already in `known_hosts` (the login
+  must work non-interactively as the runner's user). No Docker needed.
 
 #### Webhost
 
-- Docker Engine + compose plugin; `<user>` is in the `docker` group.
-- Reverse proxy rule: `https://<domain>` → `http://127.0.0.1:8080` (or whatever `WEB_PORT` is set to). If the proxy runs
+- Docker Engine + compose plugin, plus the deploy entry point behind the SSH login: it receives the release tarball and
+  the commit sha, builds, restarts and cleans up. Its compose file and `.env` (e.g. the host port) live on the host.
+- Reverse proxy rule: `https://<domain>` → `http://127.0.0.1:8080` (or whatever host port the `.env` sets). If the proxy runs
   in Docker on the same host, replace the `ports` entry in `compose.yml` with a shared external network instead — and
   target the container on **8080**, not 80 (see **Rootless** above).
 - The proxy is also where `Strict-Transport-Security` belongs; the container serves plain HTTP and sets every other
@@ -269,10 +268,9 @@ OPFS needs a secure context, so the site must be reached over `https://`.
 
 #### GitHub repository → Settings → Secrets and variables → Actions → Variables
 
-| Variable     | Value                                              |
-|--------------|----------------------------------------------------|
-| `SSH_TARGET` | `<user>@<host>` (required)                         |
-| `WEB_PORT`   | host port to publish on (optional, default `8080`) |
+| Variable     | Value                      |
+|--------------|----------------------------|
+| `SSH_TARGET` | `<user>@<host>` (required) |
 
 #### Firebase / Google console (prod project `nonogram-trainpaths`)
 
@@ -311,7 +309,7 @@ In a browser: `https://<domain>` loads, sign-in works, and a puzzle in progress 
 ### Alternatives not taken
 
 - **Registry (GHCR) + `docker compose pull` on the host** — needs a token on the host and a public/private package; the
-  SSH Docker context needs neither. Switch to it if the image ever needs to be deployed to more than one host.
+  SSH upload needs neither. Switch to it if the image ever needs to be deployed to more than one host.
 - **Re-deploying the js bundle with a feature-detect fallback** — a script in `index.html` could redirect a browser
   without wasm-GC to a `/js/` build. That means restoring the second `jsBrowserDistribution` step, which is exactly the
   memory the runner did not have. Worth revisiting if the runner grows.
